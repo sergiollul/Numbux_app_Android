@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Numbux</string>
+    <string name="accessibility_service_description">Servicio de control parental Numbux</string>
+</resources>
