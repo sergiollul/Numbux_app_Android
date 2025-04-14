@@ -1,7 +1,6 @@
 package com.example.numbux.ui
 
 import android.app.Activity
-import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
@@ -19,7 +18,6 @@ class PinActivity : Activity() {
 
         val input = findViewById<EditText>(R.id.editTextPin)
         val btn = findViewById<Button>(R.id.buttonUnlock)
-
         val appPackage = intent.getStringExtra("app_package")
 
         btn.setOnClickListener {
@@ -34,4 +32,15 @@ class PinActivity : Activity() {
             }
         }
     }
+
+    override fun onPause() {
+        super.onPause()
+        BlockManager.isShowingPin = false
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        BlockManager.isShowingPin = false
+    }
+
 }

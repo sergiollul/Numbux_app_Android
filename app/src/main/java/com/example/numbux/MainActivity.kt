@@ -12,17 +12,41 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.numbux.control.BlockManager
 import com.example.numbux.ui.PinActivity
 import com.example.numbux.ui.theme.NumbuxTheme
+import com.example.numbux.utils.getAllInstalledAppPackages
+import com.example.numbux.control.BlockManager
+import com.example.numbux.utils.getDefaultLauncherPackage
+import android.util.Log
+
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        Log.d("Numbux", "MainActivity arrancó correctamente")
 
-        // Bloquear YouTube como prueba
-        BlockManager.blockApp("com.google.android.youtube")
+        val launcherPackage = getDefaultLauncherPackage(this)
+
+        val whitelist = mutableListOf(
+            packageName,
+            "com.android.settings",
+            "com.android.systemui",
+            "com.android.inputmethod.latin",
+            "com.google.android.inputmethod.latin",
+            "com.samsung.android.inputmethod",
+            "com.miui.securitycenter"
+        )
+
+        launcherPackage?.let {
+            whitelist.add(it)
+        }
+
+        BlockManager.setBlockedAppsExcept(this, whitelist)
+        Log.d("Numbux", "Bloqueadas: ${BlockManager.getBlockedAppsDebug()}")
+
+
 
         setContent {
             NumbuxTheme {
