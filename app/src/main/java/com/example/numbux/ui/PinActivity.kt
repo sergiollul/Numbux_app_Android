@@ -7,6 +7,7 @@ import android.widget.EditText
 import android.widget.Toast
 import com.example.numbux.R
 import com.example.numbux.control.BlockManager
+import android.util.Log
 
 class PinActivity : Activity() {
 
@@ -41,6 +42,7 @@ class PinActivity : Activity() {
     override fun onDestroy() {
         super.onDestroy()
         BlockManager.isShowingPin = false
+        Log.d("Numbux", "🔓 isShowingPin reset a false")
     }
 
 }
