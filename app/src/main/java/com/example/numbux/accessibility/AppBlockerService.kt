@@ -22,11 +22,26 @@ class AppBlockerService : AccessibilityService() {
         val packageName = event.packageName?.toString() ?: return
         val className = event.className?.toString() ?: ""
 
+        Log.d("Numbux", "🎯 className detectado: $className en $packageName")
+
         Log.d("Numbux", "📍 Clase detectada: $className")
         Log.d("Numbux", "🔍 Texto raíz: ${rootInActiveWindow?.text}")
         Log.d("Numbux", "🕵️ Evento detectado: ${event.eventType}, paquete: $packageName")
         Log.d("Numbux", "🚩 isAppBlocked($packageName) = ${BlockManager.isAppBlocked(packageName)}")
         Log.d("Numbux", "🔒 isShowingPin = ${BlockManager.isShowingPin}")
+
+        // 👇 IGNORAR búsqueda con lupa en ajustes
+        val clasesIgnoradas = listOf(
+            "com.android.settings.intelligence.search.SearchActivity", // lupa nueva
+            "SearchSettingsActivity", // algunas versiones usan este nombre
+            "SettingsHomepageActivity" // inicio de Ajustes
+        )
+
+        if (clasesIgnoradas.any { className.contains(it, ignoreCase = true) }) {
+            Log.d("Numbux", "🔍 Ignorando pantalla de sistema: $className")
+            return
+        }
+
 
         val accesoSensibles = listOf(
             "AccessibilitySettingsActivity",
@@ -119,10 +134,12 @@ class AppBlockerService : AccessibilityService() {
             "com.android.systemui",
             "com.android.inputmethod.latin",
             "com.google.android.inputmethod.latin",
-            "com.samsung.android.inputmethod",
+            "com.samsung.android.inputmethod",        // teclado Samsung viejo
+            "com.samsung.android.honeyboard",         // ✅ este es el nuevo, HONEYBOARD
             "com.miui.securitycenter",
             "com.sec.android.app.launcher",
-            "com.samsung.android.spay"
+            "com.samsung.android.spay",
+            "com.android.settings.intelligence"
         )
 
         getDefaultLauncherPackage(this)?.let {
@@ -131,7 +148,11 @@ class AppBlockerService : AccessibilityService() {
         }
 
         BlockManager.setBlockedAppsExcept(this, whitelist)
-        Log.d("Numbux", "📋 Apps bloqueadas: ${BlockManager.getBlockedAppsDebug()}")
+        Log.d("Numbux", "🛡️ Whitelist completa: $whitelist")
+
+        val bloqueadas = BlockManager.getBlockedAppsDebug()
+        Log.d("Numbux", "📋 Apps bloqueadas: $bloqueadas")
+        Log.d("Numbux", "❌ ¿Search bloqueado?: ${bloqueadas.contains("com.android.settings.intelligence")}")
     }
 
     private fun findNodesByText(node: AccessibilityNodeInfo?, text: String, result: MutableList<AccessibilityNodeInfo>) {
