@@ -1,5 +1,6 @@
 package com.example.numbux
 
+import com.example.numbux.accessibility.AppBlockerService
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -21,8 +22,30 @@ import com.example.numbux.ui.PinActivity
 import com.example.numbux.ui.theme.NumbuxTheme
 import com.example.numbux.utils.getDefaultLauncherPackage
 import com.example.numbux.control.BlockManager
+import android.app.AlertDialog
+
 
 class MainActivity : ComponentActivity() {
+
+    private fun isAccessibilityServiceEnabled(): Boolean {
+        val expectedComponentName = ComponentName(this, AppBlockerService::class.java)
+        val enabledServices = Settings.Secure.getString(
+            contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ) ?: return false
+
+        val colonSplitter = TextUtils.SimpleStringSplitter(':')
+        colonSplitter.setString(enabledServices)
+
+        for (component in colonSplitter) {
+            if (ComponentName.unflattenFromString(component) == expectedComponentName) {
+                return true
+            }
+        }
+
+        return false
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (!Settings.canDrawOverlays(this)) {
@@ -60,11 +83,16 @@ class MainActivity : ComponentActivity() {
         if (!isAccessibilityServiceEnabled(this, "com.example.numbux.accessibility.AppBlockerService")) {
             Log.w("Numbux", "⚠️ Servicio de accesibilidad desactivado")
 
-            val intent = Intent(this, PinActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                putExtra("app_package", "accessibility_shutdown")
+            val builder = AlertDialog.Builder(this)
+            builder.setTitle("Activar Accesibilidad")
+            builder.setMessage("Para que Numbux funcione correctamente, ve a 'Apps instaladas'. Después 'Numbux' y actívalo.")
+            builder.setPositiveButton("Entendido") { _, _ ->
+                // 🔁 Redirige a la pantalla de Accesibilidad
+                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                startActivity(intent)
             }
-            startActivity(intent)
+            builder.setCancelable(false)
+            builder.show()
         } else {
             Log.d("Numbux", "🟢 Accesibilidad activa")
         }
