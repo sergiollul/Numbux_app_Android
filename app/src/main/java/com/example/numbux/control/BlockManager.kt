@@ -7,6 +7,12 @@ object BlockManager {
     private val blockedApps = mutableSetOf<String>()
     private val temporarilyAllowed = mutableSetOf<String>()
 
+    private val dismissedPackages = mutableSetOf<String>()  // 👈 NUEVO
+
+    fun resetFirstEvent() {
+        firstEventSkipped = false
+    }
+
     fun isAppBlocked(packageName: String): Boolean {
         return blockedApps.contains(packageName) && !temporarilyAllowed.contains(packageName)
     }
@@ -49,4 +55,75 @@ object BlockManager {
     }
 
     var isShowingPin = false
+
+    private var accessibilityServiceInitialized = false
+
+    private var firstEventSkipped = false
+
+    fun shouldSkipFirstEvent(): Boolean = !firstEventSkipped
+
+    fun markFirstEventHandled() {
+        firstEventSkipped = true
+    }
+
+    fun markAccessibilityServiceInitialized() {
+        accessibilityServiceInitialized = true
+    }
+
+    fun isAccessibilityServiceInitialized(): Boolean {
+        return accessibilityServiceInitialized
+    }
+
+    // 🔁 Nueva lógica: solo ignora PIN mientras no cambie de app
+    fun dismissUntilAppChanges(packageName: String) {
+        dismissedPackages.add(packageName)
+    }
+
+    fun isDismissed(packageName: String): Boolean {
+        return dismissedPackages.contains(packageName)
+    }
+
+    fun clearDismissed(packageName: String) {
+        dismissedPackages.remove(packageName)
+    }
+
+    fun resetAllDismissedIfPackageChanged(currentPackage: String) {
+        val iterator = dismissedPackages.iterator()
+        while (iterator.hasNext()) {
+            val pkg = iterator.next()
+            if (pkg != currentPackage) {
+                iterator.remove()
+            }
+        }
+    }
+
+    // ⏱️ Control de tiempo opcional (mantener por si se quiere usar luego)
+    private var lastPinShownTime: Long = 0
+
+    fun shouldShowPin(): Boolean {
+        val now = System.currentTimeMillis()
+        return (now - lastPinShownTime) > 1000
+    }
+
+    fun markPinShown() {
+        lastPinShownTime = System.currentTimeMillis()
+    }
+
+    fun clearAllDismissed() {
+        dismissedPackages.clear()
+    }
+
+    // ⚡ Forzar evaluación de evento aunque no cambie de paquete
+    private var forceEvaluateOnce = false
+
+    fun shouldForceEvaluate(): Boolean {
+        val should = forceEvaluateOnce
+        forceEvaluateOnce = false
+        return should
+    }
+
+    fun markForceEvaluateOnce() {
+        forceEvaluateOnce = true
+    }
+
 }

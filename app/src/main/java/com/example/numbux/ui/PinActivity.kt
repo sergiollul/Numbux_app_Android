@@ -27,6 +27,8 @@ class PinActivity : Activity() {
                     BlockManager.allowTemporarily(appPackage)
                     Toast.makeText(this, "App desbloqueada temporalmente", Toast.LENGTH_SHORT).show()
                 }
+                setResult(Activity.RESULT_OK)
+                BlockManager.isShowingPin = false
                 finish()
             } else {
                 Toast.makeText(this, "PIN incorrecto", Toast.LENGTH_SHORT).show()
@@ -36,13 +38,24 @@ class PinActivity : Activity() {
 
     override fun onPause() {
         super.onPause()
+        Log.d("Numbux", "🛑 PinActivity -> onPause")
         BlockManager.isShowingPin = false
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        Log.d("Numbux", "💀 PinActivity -> onDestroy")
         BlockManager.isShowingPin = false
-        Log.d("Numbux", "🔓 isShowingPin reset a false")
+
+        // Si no se desbloqueó correctamente, recordar que fue rechazado
+        val appPackage = intent.getStringExtra("app_package")
+        if (!appPackage.isNullOrEmpty()) {
+            BlockManager.dismissUntilAppChanges(appPackage)
+            Log.d("Numbux", "❌ PIN rechazado para $appPackage (temporalmente ignorado)")
+        }
     }
 
+    override fun onBackPressed() {
+        // No permitir cerrar con back
+    }
 }

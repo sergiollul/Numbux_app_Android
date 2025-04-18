@@ -19,7 +19,56 @@ class AppBlockerService : AccessibilityService() {
     private var overlayVisible = false
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
+        if (!BlockManager.isAccessibilityServiceInitialized()) {
+            Log.d("Numbux", "⏳ Servicio aún no inicializado completamente. Ignorando evento.")
+            return
+        }
+
+//        if (BlockManager.shouldSkipFirstEvent()) {
+  //          BlockManager.markFirstEventHandled()
+    //        Log.d("Numbux", "⛔ Ignorando primer evento tras iniciar accesibilidad")
+      //      return
+        //}
+
         val packageName = event.packageName?.toString() ?: return
+
+        val defaultLauncher = getDefaultLauncherPackage(this)
+        if (packageName == defaultLauncher) {
+            Log.d("Numbux", "🚫 Ignorando evento del launcher ($packageName)")
+            return
+        }
+
+        // ⏳ Bloquear eventos si el servicio aún no está listo
+        if (!BlockManager.isAccessibilityServiceInitialized()) {
+            Log.d("Numbux", "⏳ Servicio aún no inicializado completamente. Ignorando evento.")
+            return
+        }
+
+        // 🎯 Solo procesar si es cambio de ventana (actividad visible)
+        if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            Log.d("Numbux", "⚠️ Evento ignorado por tipo: ${event.eventType}")
+            return
+        }
+
+        // ✅ Si el usuario está en el launcher, limpiar los dismissed
+        if (packageName == getDefaultLauncherPackage(this)) {
+            Log.d("Numbux", "🏠 Usuario en el launcher, reseteando dismissedPackages")
+            BlockManager.clearAllDismissed()
+        }
+
+        // ✅ Reinicia los dismiss si el usuario cambió de app
+        if (packageName != lastPackage) {
+            Log.d("Numbux", "📲 Cambio de app detectado: $lastPackage -> $packageName")
+
+            // 🔄 Limpiar dismissed si se reabre la misma app
+            if (BlockManager.isDismissed(packageName)) {
+                Log.d("Numbux", "🔁 Reapertura detectada de $packageName, removiendo de dismissed")
+                BlockManager.clearDismissed(packageName)
+            }
+
+            BlockManager.resetAllDismissedIfPackageChanged(packageName)
+        }
+
         val className = event.className?.toString() ?: ""
 
         Log.d("Numbux", "🎯 className detectado: $className en $packageName")
@@ -51,7 +100,12 @@ class AppBlockerService : AccessibilityService() {
         )
 
         // Overlay si se abre pantalla sensible con Numbux
-        if (packageName == "com.android.settings" && accesoSensibles.any { className.contains(it, true) }) {
+        if (packageName == "com.android.settings" && accesoSensibles.any {
+                className.contains(
+                    it,
+                    true
+                )
+            }) {
             val rootNode = rootInActiveWindow ?: return
             val contieneNumbux = rootNode.text?.toString()?.contains("Numbux", true) == true
                     || hasNodeWithText(rootNode, "Numbux")
@@ -83,42 +137,88 @@ class AppBlockerService : AccessibilityService() {
                 BlockManager.isShowingPin = true
                 performGlobalAction(GLOBAL_ACTION_BACK)
 
-                Handler(Looper.getMainLooper()).postDelayed({
-                    val intent = Intent(this, PinActivity::class.java).apply {
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        putExtra("app_package", "com.android.settings")
-                    }
-                    startActivity(intent)
-                }, 100)
-
                 mostrarOverlaySobreBotonDesactivar()
                 return
             }
         }
 
         // Bloqueo normal por apps
-        if (packageName == lastPackage) return
+        // ⚠️ Si es el mismo paquete, pero el sistema no lanzó otro evento, evaluamos igualmente si la app visible cambió
+        if (packageName == lastPackage && !BlockManager.shouldForceEvaluate()) {
+            val currentTop = getTopAppPackage()
+            if (currentTop != null && currentTop != lastPackage) {
+                Log.d("Numbux", "🔁 La app visible ($currentTop) cambió aunque el paquete no: forzando reevaluación")
+                BlockManager.markForceEvaluateOnce()
+            } else {
+                Log.d("Numbux", "⏭️ Mismo paquete y sin cambio visual, no evaluamos")
+                return
+            }
+        }
         lastPackage = packageName
 
-        if (BlockManager.isAppBlocked(packageName) && !BlockManager.isShowingPin) {
-            Log.d("Numbux", "Bloqueada y mostrando PIN: $packageName")
+        // 🧪 Ignorar si es el PIN mostrándose (evita loops)
+        if (className.contains("PinActivity", ignoreCase = true)) {
+            Log.d("Numbux", "🚫 Ignorando evento de PinActivity")
+            return
+        }
 
-            BlockManager.isShowingPin = true
-            performGlobalAction(GLOBAL_ACTION_BACK)
+        // ❌ No mostrar PIN si es nuestra propia app
+        if (packageName == applicationContext.packageName) {
+            Log.d("Numbux", "🚫 Ignorando evento de nuestra propia app")
+            return
+        }
 
-            Handler(Looper.getMainLooper()).postDelayed({
-                val intent = Intent(this, PinActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        // 🛡️ Evita mostrar PIN si el usuario ya lo rechazó antes
+        if (BlockManager.isDismissed(packageName)) {
+            Log.d("Numbux", "🚫 App $packageName fue rechazada antes. No mostramos PIN de nuevo.")
+            return
+        }
+
+        Log.d("Numbux", "🧪 Evaluando bloqueo para $packageName: isAppBlocked=${BlockManager.isAppBlocked(packageName)}")
+        Log.d("Numbux", "🧪 Evaluando si debemos mostrar PIN para $packageName")
+
+        Handler(Looper.getMainLooper()).postDelayed({
+            val currentPackage = try {
+                rootInActiveWindow?.packageName
+            } catch (e: Exception) {
+                Log.w("Numbux", "⚠️ Error leyendo rootInActiveWindow tras delay: ${e.message}")
+                null
+            }
+
+            Log.d("Numbux", "📦 postDelayed → currentPackage=$currentPackage")
+            Log.d("Numbux", "📦 postDelayed → expectedPackage=$packageName")
+            Log.d("Numbux", "📦 postDelayed → isShowingPin=${BlockManager.isShowingPin}")
+            Log.d("Numbux", "📦 postDelayed → isAppBlocked=${BlockManager.isAppBlocked(packageName)}")
+
+            if (currentPackage == packageName && !BlockManager.isShowingPin && BlockManager.isAppBlocked(packageName)) {
+                Log.d("Numbux", "✅ Condiciones cumplidas. Mostramos PIN para $packageName")
+                BlockManager.isShowingPin = true
+                val broadcast = Intent("com.example.numbux.SHOW_PIN").apply {
+                    setPackage("com.example.numbux") // asegúrate de que sea tu propio paquete, no el de la app bloqueada
                     putExtra("app_package", packageName)
                 }
-                startActivity(intent)
-            }, 100)
-        }
+                BlockManager.markPinShown()
+                Log.d("Numbux", "📣 Enviando broadcast para mostrar PIN a $packageName desde ${applicationContext.packageName}")
+                sendBroadcast(broadcast)
+
+                Handler(Looper.getMainLooper()).postDelayed({
+                    BlockManager.isShowingPin = false
+                    Log.d("Numbux", "⏲️ Timeout: Reiniciando isShowingPin por seguridad")
+                }, 1_000) // 10 segundos, puedes ajustar
+
+            } else {
+                Log.d("Numbux", "❌ Condiciones NO cumplidas. No se muestra PIN para $packageName")
+            }
+        }, 200)
     }
 
     override fun onInterrupt() {}
 
     override fun onServiceConnected() {
+
+        super.onServiceConnected()
+        Log.d("Numbux", "✅ Servicio de accesibilidad conectado")
+
         val info = AccessibilityServiceInfo().apply {
             eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
             feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
@@ -147,8 +247,50 @@ class AppBlockerService : AccessibilityService() {
             whitelist.add(it)
         }
 
-        BlockManager.setBlockedAppsExcept(this, whitelist)
-        Log.d("Numbux", "🛡️ Whitelist completa: $whitelist")
+        Handler(Looper.getMainLooper()).postDelayed({
+            val whitelist = mutableListOf(
+                packageName,
+                "com.android.settings",
+                "com.android.systemui",
+                "com.android.inputmethod.latin",
+                "com.google.android.inputmethod.latin",
+                "com.samsung.android.inputmethod",
+                "com.samsung.android.honeyboard",
+                "com.miui.securitycenter",
+                "com.sec.android.app.launcher",
+                "com.samsung.android.spay",
+                "com.android.settings.intelligence"
+            )
+
+            getDefaultLauncherPackage(this)?.let {
+                Log.d("Numbux", "✅ Launcher detectado: $it")
+                whitelist.add(it)
+            }
+
+            BlockManager.resetFirstEvent()
+            BlockManager.setBlockedAppsExcept(this, whitelist)
+            BlockManager.markAccessibilityServiceInitialized()
+            Log.d("Numbux", "✅ Servicio inicializado completamente tras delay")
+
+            // 👁️ Evaluamos manualmente la app activa usando ActivityManager
+            val topApp = getTopAppPackage()
+            if (!topApp.isNullOrEmpty()) {
+                Log.d("Numbux", "🔥 Evaluando app visible al encender accesibilidad: $topApp")
+
+                BlockManager.markForceEvaluateOnce()
+
+                val fakeEvent = AccessibilityEvent.obtain().apply {
+                    eventType = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                    packageName = topApp
+                    className = "" // opcional
+                }
+
+                onAccessibilityEvent(fakeEvent)
+            } else {
+                Log.w("Numbux", "⚠️ No se pudo determinar la app activa al activar accesibilidad")
+            }
+
+        }, 300)
 
         val bloqueadas = BlockManager.getBlockedAppsDebug()
         Log.d("Numbux", "📋 Apps bloqueadas: $bloqueadas")
@@ -186,6 +328,11 @@ class AppBlockerService : AccessibilityService() {
             Log.d("Numbux", "📦 Coordenadas botón: $bounds")
 
             val intent = Intent(this, OverlayBlockerService::class.java).apply {
+                addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_CLEAR_TASK or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP
+                )
                 putExtra("x", bounds.left)
                 putExtra("y", bounds.top)
                 putExtra("width", bounds.width())
@@ -194,4 +341,14 @@ class AppBlockerService : AccessibilityService() {
             startService(intent)
         }, 500)
     }
+
+    private fun getTopAppPackage(): String? {
+        val am = getSystemService(ACTIVITY_SERVICE) as android.app.ActivityManager
+        val tasks = am.appTasks
+        return tasks.firstOrNull()
+            ?.taskInfo
+            ?.topActivity
+            ?.packageName
+    }
+
 }
