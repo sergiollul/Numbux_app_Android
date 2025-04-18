@@ -65,7 +65,7 @@
         <!-- Pin Activity -->
         <activity
             android:name=".ui.PinActivity"
-            android:theme="@android:style/Theme.DeviceDefault.Dialog"
+            android:theme="@style/Theme.Numbux.Fullscreen"
             android:exported="true"
             android:excludeFromRecents="true"
             android:launchMode="singleTop"

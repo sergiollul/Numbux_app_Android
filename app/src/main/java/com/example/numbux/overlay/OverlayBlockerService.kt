@@ -4,9 +4,9 @@ import android.app.Service
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.IBinder
+import android.util.Log
 import android.view.*
 import android.widget.FrameLayout
-import android.util.Log
 import com.example.numbux.R
 
 class OverlayBlockerService : Service() {
@@ -22,43 +22,47 @@ class OverlayBlockerService : Service() {
             return START_NOT_STICKY
         }
 
-        Log.d("OverlayBlocker", "🛡️ Creando overlay")
-
-        // 👉 LOGS para depurar coordenadas recibidas
-        val x = intent?.getIntExtra("x", 200) ?: 200
-        val y = intent?.getIntExtra("y", 600) ?: 600
-        val width = intent?.getIntExtra("width", 300) ?: 300
-        val height = intent?.getIntExtra("height", 100) ?: 100
-
-        // 🪵 Log extra para confirmar coordenadas y visibilidad
-        Log.d("Overlay", "🛑 Añadiendo overlay en x=$x y=$y w=$width h=$height")
-        Log.d("OverlayBlocker", "🧩 Overlay en posición: x=$x y=$y w=$width h=$height")
+        Log.d("OverlayBlocker", "🛡️ Creando overlay de pantalla completa")
 
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         val inflater = getSystemService(LAYOUT_INFLATER_SERVICE) as LayoutInflater
         overlayView = inflater.inflate(R.layout.overlay_blocker, null)
 
-        val params = WindowManager.LayoutParams(
-            width,
-            height,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-            PixelFormat.TRANSLUCENT
-        )
-
-        params.gravity = Gravity.TOP or Gravity.START
-        params.x = x
-        params.y = y
-
+        // 👇 Bloquea todos los toques
         overlayView?.setOnTouchListener { _, _ ->
             Log.d("OverlayBlocker", "🚫 Toque bloqueado por overlay")
-            true // bloquea el toque
+            true
         }
+        overlayView?.isClickable = true
+        overlayView?.isFocusable = true
 
-        // 🔴 Ayuda visual para pruebas (comenta cuando termines)
+        // 🔴 Ayuda visual para pruebas (puedes comentar esto en producción)
         overlayView?.setBackgroundColor(0x55FF0000) // rojo semi-transparente
 
-        windowManager.addView(overlayView, params)
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O)
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            else
+                WindowManager.LayoutParams.TYPE_PHONE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                    WindowManager.LayoutParams.FLAG_FULLSCREEN or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = 0
+            y = 0
+        }
+
+        try {
+            windowManager.addView(overlayView, params)
+        } catch (e: Exception) {
+            Log.e("OverlayBlocker", "💥 Error al añadir overlay: ${e.message}")
+        }
 
         return START_NOT_STICKY
     }

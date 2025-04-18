@@ -8,6 +8,13 @@ import android.widget.Toast
 import com.example.numbux.R
 import com.example.numbux.control.BlockManager
 import android.util.Log
+import android.content.Intent
+import android.view.MotionEvent // ← Required for dispatchTouchEvent
+import android.view.WindowManager
+import android.graphics.Rect
+import android.view.View
+
+
 
 class PinActivity : Activity() {
 
@@ -27,6 +34,10 @@ class PinActivity : Activity() {
                     BlockManager.allowTemporarily(appPackage)
                     Toast.makeText(this, "App desbloqueada temporalmente", Toast.LENGTH_SHORT).show()
                 }
+
+                // ✅ Apagar el overlay al ingresar el PIN correcto
+                stopService(Intent(this, com.example.numbux.overlay.OverlayBlockerService::class.java))
+
                 setResult(Activity.RESULT_OK)
                 BlockManager.isShowingPin = false
                 finish()
@@ -34,12 +45,42 @@ class PinActivity : Activity() {
                 Toast.makeText(this, "PIN incorrecto", Toast.LENGTH_SHORT).show()
             }
         }
+
+        // ✅ Prevent interaction with buttons behind the dialog
+        window.addFlags(
+            WindowManager.LayoutParams.FLAG_FULLSCREEN or
+                    WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+                    WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                    WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
+                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+        )
+    }
+
+    // ✅ This consumes all touch events so nothing passes through
+    override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
+        val pinLayout = findViewById<View>(R.id.pinLayoutRoot) // <- your main container
+        if (pinLayout != null) {
+            val rect = Rect()
+            pinLayout.getGlobalVisibleRect(rect)
+            if (rect.contains(ev?.rawX?.toInt() ?: 0, ev?.rawY?.toInt() ?: 0)) {
+                // Touch is inside the PIN UI, allow it
+                return super.dispatchTouchEvent(ev)
+            } else {
+                // Touch is outside, consume it
+                Log.d("Numbux", "❌ Tap fuera del PIN bloqueado")
+                return true
+            }
+        }
+        return super.dispatchTouchEvent(ev)
     }
 
     override fun onPause() {
         super.onPause()
         Log.d("Numbux", "🛑 PinActivity -> onPause")
+
         BlockManager.isShowingPin = false
+
+        // No relaunch if the user leaves the PIN, we allow normal navigation
     }
 
     override fun onDestroy() {
@@ -47,7 +88,6 @@ class PinActivity : Activity() {
         Log.d("Numbux", "💀 PinActivity -> onDestroy")
         BlockManager.isShowingPin = false
 
-        // Si no se desbloqueó correctamente, recordar que fue rechazado
         val appPackage = intent.getStringExtra("app_package")
         if (!appPackage.isNullOrEmpty()) {
             BlockManager.dismissUntilAppChanges(appPackage)
