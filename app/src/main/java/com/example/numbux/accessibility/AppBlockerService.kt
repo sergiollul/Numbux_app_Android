@@ -19,172 +19,95 @@ class AppBlockerService : AccessibilityService() {
     private var overlayVisible = false
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
+        // 1️⃣ Evita procesar eventos antes de estar listo
         if (!BlockManager.isAccessibilityServiceInitialized()) {
             Log.d("Numbux", "⏳ Servicio aún no inicializado completamente. Ignorando evento.")
             return
         }
 
-//        if (BlockManager.shouldSkipFirstEvent()) {
-  //          BlockManager.markFirstEventHandled()
-    //        Log.d("Numbux", "⛔ Ignorando primer evento tras iniciar accesibilidad")
-      //      return
-        //}
-
+        // 2️⃣ Obtiene el package y nombre de clase
         val packageName = event.packageName?.toString() ?: return
+        val className   = event.className?.toString() ?: ""
 
-        val defaultLauncher = getDefaultLauncherPackage(this)
-        if (packageName == defaultLauncher) {
-            Log.d("Numbux", "🚫 Ignorando evento del launcher ($packageName)")
-            return
+        // 3️⃣ Ignora eventos del launcher
+        getDefaultLauncherPackage(this)?.let { launcher ->
+            if (packageName == launcher) {
+                Log.d("Numbux", "🚫 Ignorando evento del launcher ($packageName)")
+                return
+            }
         }
 
-        // ⏳ Bloquear eventos si el servicio aún no está listo
-        if (!BlockManager.isAccessibilityServiceInitialized()) {
-            Log.d("Numbux", "⏳ Servicio aún no inicializado completamente. Ignorando evento.")
-            return
-        }
-
-        // 🎯 Solo procesar si es cambio de ventana (actividad visible)
+        // 4️⃣ Solo procesar cambios de ventana
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             Log.d("Numbux", "⚠️ Evento ignorado por tipo: ${event.eventType}")
             return
         }
 
-        // 🚦 Si el usuario ya desbloqueó esta app con PIN, omitimos cualquier bloqueo adicional
-        if (BlockManager.isTemporarilyAllowed(packageName)) {
+        // 🚦 Si el usuario ya desbloqueó esta app con PIN, omitimos cualquier bloqueo adicional,
+        //      salvo que esté apareciendo la pantalla de desinstalación
+        if (BlockManager.isTemporarilyAllowed(packageName)
+            && !esPantallaDeDesinstalacion(className, packageName)
+        ) {
             Log.d("Numbux", "✅ App $packageName desbloqueada temporalmente, omitiendo bloqueo")
             return
         }
 
-        // ✅ Si el usuario está en el launcher, limpiar los dismissed
+        // 5️⃣ Limpia dismissed si volvemos al launcher
         if (packageName == getDefaultLauncherPackage(this)) {
             Log.d("Numbux", "🏠 Usuario en el launcher, reseteando dismissedPackages")
             BlockManager.clearAllDismissed()
         }
 
-        // ✅ Reinicia los dismiss si el usuario cambió de app
+        // 6️⃣ Reinicia dismissed si cambió de app
         if (packageName != lastPackage) {
             Log.d("Numbux", "📲 Cambio de app detectado: $lastPackage -> $packageName")
-
-            // 🔄 Limpiar dismissed si se reabre la misma app
             if (BlockManager.isDismissed(packageName)) {
-                Log.d("Numbux", "🔁 Reapertura detectada de $packageName, removiendo de dismissed")
+                Log.d("Numbux", "🔁 Reapertura de $packageName, eliminando de dismissed")
                 BlockManager.clearDismissed(packageName)
             }
-
             BlockManager.resetAllDismissedIfPackageChanged(packageName)
         }
+        lastPackage = packageName
 
-        val className = event.className?.toString() ?: ""
-
-        Log.d("Numbux", "🎯 className detectado: $className en $packageName")
-
-        Log.d("Numbux", "📍 Clase detectada: $className")
-        Log.d("Numbux", "🔍 Texto raíz: ${rootInActiveWindow?.text}")
-        Log.d("Numbux", "🕵️ Evento detectado: ${event.eventType}, paquete: $packageName")
-        Log.d("Numbux", "🚩 isAppBlocked($packageName) = ${BlockManager.isAppBlocked(packageName)}")
-        Log.d("Numbux", "🔒 isShowingPin = ${BlockManager.isShowingPin}")
-
-        if (esIntentoDesactivarAccesibilidad(className, packageName)) {
-            Log.d("Numbux", "⚠️ Intento de desactivar accesibilidad detectado (AlertDialog)")
-
-            val rootNode = rootInActiveWindow
-            if (rootNode != null && !overlayVisible) {
-                val textos = listOf("Desactivar", "Turn Off", "Disable")
-                val nodes = textos.flatMap { rootNode.findAccessibilityNodeInfosByText(it) }
-
-                if (nodes.isNotEmpty()) {
-                    val node = nodes.first()
-                    val bounds = android.graphics.Rect()
-                    node.getBoundsInScreen(bounds)
-
-                    Log.d("Numbux", "🛡️ Coordenadas botón Turn Off: $bounds")
-
-                    val intent = Intent(this, OverlayBlockerService::class.java).apply {
-                        putExtra("x", bounds.left)
-                        putExtra("y", bounds.top)
-                        putExtra("width", bounds.width())
-                        putExtra("height", bounds.height())
-                    }
-                    startService(intent)
-                    overlayVisible = true
-                }
-            }
-
-            if (!BlockManager.isShowingPin) {
-                BlockManager.isShowingPin = true
-                val broadcast = Intent("com.example.numbux.SHOW_PIN").apply {
-                    setPackage("com.example.numbux")
-                    putExtra("app_package", "com.android.settings")
-                }
-                sendBroadcast(broadcast)
-
-                Handler(Looper.getMainLooper()).postDelayed({
-                    BlockManager.isShowingPin = false
-                }, 6_000)
-            }
-
+        // 7️⃣ Evita loops con PinActivity y con tu propia app
+        if (className.contains("PinActivity", ignoreCase = true)
+            || packageName == applicationContext.packageName
+        ) {
+            Log.d("Numbux", "🚫 Ignorando evento interno o de PIN")
             return
         }
 
+        // 8️⃣ No mostrar PIN si ya rehusó antes
+        if (BlockManager.isDismissed(packageName)) {
+            Log.d("Numbux", "🚫 App $packageName fue rechazada antes. No mostramos PIN de nuevo.")
+            return
+        }
 
+        // 9️⃣ Detección de diálogo de desinstalación
         if (esPantallaDeDesinstalacion(className, packageName)) {
             Log.d("Numbux", "⚠️ Intento de desinstalación detectado: $className")
-
             if (!BlockManager.isShowingPin) {
-                BlockManager.isShowingPin = true
-
-                val rootNode = rootInActiveWindow
-
-                // 🧪 Extra debug
-                Log.d("Numbux", "📋 rootInActiveWindow = $rootNode")
-                val uninstallNodes = rootNode?.findAccessibilityNodeInfosByText("Uninstall")
-                val desinstalarNodes = rootNode?.findAccessibilityNodeInfosByText("Desinstalar")
-                val eliminarNodes = rootNode?.findAccessibilityNodeInfosByText("Eliminar")
-                val quitarNodes = rootNode?.findAccessibilityNodeInfosByText("Quitar")
-
-                Log.d("Numbux", "🔍 Uninstall nodes found: ${uninstallNodes?.size}")
-                Log.d("Numbux", "🔍 Desinstalar nodes found: ${desinstalarNodes?.size}")
-                Log.d("Numbux", "🔍 Eliminar nodes found: ${eliminarNodes?.size}")
-                Log.d("Numbux", "🔍 Quitar nodes found: ${quitarNodes?.size}")
-
-                val uninstallNode = listOf("Uninstall", "Desinstalar", "Eliminar", "Quitar")
-                    .flatMap { rootNode?.findAccessibilityNodeInfosByText(it) ?: emptyList() }
-                    .firstOrNull()
-
-                if (uninstallNode != null) {
-                    val bounds = android.graphics.Rect()
-                    uninstallNode.getBoundsInScreen(bounds)
-
-                    val overlayIntent = Intent(this, OverlayBlockerService::class.java).apply {
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        putExtra("x", bounds.left)
-                        putExtra("y", bounds.top)
-                        putExtra("width", bounds.width())
-                        putExtra("height", bounds.height())
-                    }
-                    startService(overlayIntent)
-                    Log.d("Numbux", "🛡️ Overlay lanzado sobre botón de desinstalación")
-                } else {
-                    Log.w("Numbux", "❌ No se encontró ningún botón de desinstalación")
-                }
-
-                // 🔐 Mostrar PIN con un pequeño delay para no chocar contra la transición de sistema
+                mostrarOverlaySobreBotonDesactivar()
                 Handler(Looper.getMainLooper()).postDelayed({
+                    // 🚀 Primero quitamos el overlay para no dejar el área roja bloqueada
+                    stopService(Intent(this@AppBlockerService, OverlayBlockerService::class.java))
+                    overlayVisible = false
+
+                    // 🔐 Ahora sí enviamos el PIN
                     val pinIntent = Intent("com.example.numbux.SHOW_PIN").apply {
-                        setPackage("com.example.numbux")
+                        // Asegúrate de usar tu propio packageName aquí
+                        setPackage(applicationContext.packageName)
                         putExtra("app_package", packageName)
                     }
                     sendBroadcast(pinIntent)
+                    BlockManager.isShowingPin = true
 
+                    // ⏲️ Limpiamos la bandera de “mostrando PIN” al cabo de 1s
                     Handler(Looper.getMainLooper()).postDelayed({
                         BlockManager.isShowingPin = false
-                        stopService(Intent(this, OverlayBlockerService::class.java)) // limpia overlay
-                        Log.d("Numbux", "⏱️ PIN y overlay reseteados")
-                    }, 5_000)
-                }, 300) // pequeño delay evita que el sistema ignore la actividad
+                    }, 1_000)
+                }, 300)
             }
-
             return
         }
 
@@ -497,15 +420,19 @@ class AppBlockerService : AccessibilityService() {
             ?.packageName
     }
 
+    private val uninstallPackages = listOf(
+        "com.android.packageinstaller",
+        "com.google.android.packageinstaller",
+        "com.android.permissioncontroller"    // Android 12+ uses this for permission/uninstall UI
+    )
+
     private fun esPantallaDeDesinstalacion(className: String?, packageName: String?): Boolean {
-        return packageName == "com.android.packageinstaller" &&
-                (className?.contains("Uninstall", ignoreCase = true) == true ||
-                        className?.contains("Uninstaller", ignoreCase = true) == true)
+        return uninstallPackages.contains(packageName) &&
+                (className?.contains("Uninstall", true) == true ||
+                        className?.contains("Uninstaller", true) == true)
     }
 
     private fun esIntentoDesactivarAccesibilidad(className: String?, packageName: String?): Boolean {
         return packageName == "com.android.settings" && className?.contains("AlertDialog", ignoreCase = true) == true
     }
-
-
 }

@@ -13,6 +13,8 @@ import android.view.MotionEvent // ← Required for dispatchTouchEvent
 import android.view.WindowManager
 import android.graphics.Rect
 import android.view.View
+import com.example.numbux.overlay.OverlayBlockerService
+
 
 
 
@@ -77,16 +79,17 @@ class PinActivity : Activity() {
     override fun onPause() {
         super.onPause()
         Log.d("Numbux", "🛑 PinActivity -> onPause")
-
         BlockManager.isShowingPin = false
 
-        // No relaunch if the user leaves the PIN, we allow normal navigation
+        // 🧹 Asegurarnos de que no quede ningún overlay bloqueando toques
+        stopService(Intent(this, OverlayBlockerService::class.java))
     }
 
     override fun onDestroy() {
         super.onDestroy()
         Log.d("Numbux", "💀 PinActivity -> onDestroy")
         BlockManager.isShowingPin = false
+        stopService(Intent(this, OverlayBlockerService::class.java))
 
         val appPackage = intent.getStringExtra("app_package")
         if (!appPackage.isNullOrEmpty()) {
