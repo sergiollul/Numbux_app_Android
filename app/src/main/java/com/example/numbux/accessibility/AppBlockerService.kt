@@ -16,7 +16,6 @@ import com.example.numbux.overlay.OverlayBlockerService
 
 class AppBlockerService : AccessibilityService() {
     private var lastPackage: String? = null
-    private var overlayVisible = false
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         // 1️⃣ Evita procesar eventos antes de estar listo
@@ -94,10 +93,6 @@ class AppBlockerService : AccessibilityService() {
             if (!BlockManager.isShowingPin) {
                 mostrarOverlaySobreBotonDesactivar()
                 Handler(Looper.getMainLooper()).postDelayed({
-                    // 🚀 Primero quitamos el overlay para no dejar el área roja bloqueada
-                    stopService(Intent(this@AppBlockerService, OverlayBlockerService::class.java))
-                    overlayVisible = false
-
                     // 🔐 Ahora sí enviamos el PIN
                     val pinIntent = Intent("com.example.numbux.SHOW_PIN").apply {
                         // Asegúrate de usar tu propio packageName aquí
@@ -149,12 +144,6 @@ class AppBlockerService : AccessibilityService() {
 
             Log.d("Numbux", "⚙️ Entrando en pantalla de ajustes sensibles: $className")
 
-            if (contieneNumbux && !overlayVisible) {
-                Log.d("Numbux", "🛡️ Mostrando overlay encima del botón 'Desactivar'")
-                startService(Intent(this, OverlayBlockerService::class.java))
-                overlayVisible = true
-            }
-
             if (!BlockManager.isShowingPin) {
                 Log.d("Numbux", "🔐 Mostrando PIN porque se intenta desactivar accesibilidad")
 
@@ -170,16 +159,8 @@ class AppBlockerService : AccessibilityService() {
                     Log.d("Numbux", "⏲️ Timeout: Reiniciando isShowingPin tras intento de desactivación")
                 }, 5_000) // un poco más largo para asegurar que el usuario vea el PIN
             }
-
-        } else {
-            if (overlayVisible) {
-                Log.d("Numbux", "🫹 Ocultando overlay")
-                stopService(Intent(this, OverlayBlockerService::class.java))
-                overlayVisible = false
-            }
         }
-
-        // Fallback: si detectamos botón desactivar
+        
         // Fallback: si detectamos botón desactivar
         if (packageName == "com.android.settings" && event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             val rootNode = rootInActiveWindow ?: return
@@ -192,7 +173,7 @@ class AppBlockerService : AccessibilityService() {
                 BlockManager.isShowingPin = true
 
                 // ❗Primero tapamos el botón
-                mostrarOverlaySobreBotonDesactivar()
+                // mostrarOverlaySobreBotonDesactivar()
 
                 // ❗Luego lanzamos el PIN
                 val broadcast = Intent("com.example.numbux.SHOW_PIN").apply {
