@@ -21,20 +21,39 @@ class AppBlockerService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
 
+        // 2️⃣ Obtiene el package y nombre de clase
+        val className   = event.className?.toString() ?: ""
+        val packageName = event.packageName?.toString() ?: return
+
+        // ─────────────────────────────────────────────────────
+        // 🚨 ALWAYS block “Turn off Accessibility” (ignore switch)
+        // 🚨 ALWAYS block “Turn off Accessibility” (ignore switch)
+        if (esIntentoDesactivarAccesibilidad(className, packageName)) {
+            mostrarOverlaySobreBotonDesactivar()
+            Handler(Looper.getMainLooper()).postDelayed({
+                // PIN the Settings screen
+                sendPinBroadcast("com.android.settings")
+            }, 300)
+            return
+        }
+
+        // 🚨 ALWAYS block “Uninstall” dialogs (ignore switch)
+        if (esPantallaDeDesinstalacion(className, packageName)) {
+            mostrarOverlaySobreBotonDesactivar()
+            Handler(Looper.getMainLooper()).postDelayed({
+                // PIN the app they’re uninstalling
+                sendPinBroadcast(packageName)
+            }, 300)
+            return
+        }
+
+        // ─────────────────────────────────────────────────────
+
+        // 🔌 now respect the in‐app toggle
         val enabled = PreferenceManager
             .getDefaultSharedPreferences(this)
             .getBoolean("blocking_enabled", true)
         if (!enabled) return
-
-        // 1️⃣ Evita procesar eventos antes de estar listo
-        if (!BlockManager.isAccessibilityServiceInitialized()) {
-            Log.d("Numbux", "⏳ Servicio aún no inicializado completamente. Ignorando evento.")
-            return
-        }
-
-        // 2️⃣ Obtiene el package y nombre de clase
-        val packageName = event.packageName?.toString() ?: return
-        val className   = event.className?.toString() ?: ""
 
         // 3️⃣ Ignora eventos del launcher
         getDefaultLauncherPackage(this)?.let { launcher ->
@@ -271,6 +290,15 @@ class AppBlockerService : AccessibilityService() {
     }
 
     override fun onInterrupt() {}
+    
+    private fun sendPinBroadcast(appPackage: String) {
+        val pinIntent = Intent("com.example.numbux.SHOW_PIN").apply {
+            setPackage(applicationContext.packageName)
+            putExtra("app_package", appPackage)
+        }
+        sendBroadcast(pinIntent)
+        BlockManager.isShowingPin = true
+    }
 
     override fun onServiceConnected() {
 
