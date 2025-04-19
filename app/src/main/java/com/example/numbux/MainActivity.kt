@@ -113,8 +113,15 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.padding(innerPadding),
                         blockingEnabled = blockingEnabled,
                         onToggleBlocking = { newValue ->
+                            // 1️⃣ update Compose state & prefs
                             blockingEnabled = newValue
                             prefs.edit().putBoolean("blocking_enabled", newValue).apply()
+
+                            if (newValue) {
+                                // 🎉 Just turned blocking back ON → reset any old PIN overrides
+                                BlockManager.clearAllDismissed()
+                                BlockManager.clearAllTemporarilyAllowed()
+                            }
                         }
                     )
                 }

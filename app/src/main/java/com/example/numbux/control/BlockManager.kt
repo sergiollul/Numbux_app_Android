@@ -133,4 +133,9 @@ object BlockManager {
         forceEvaluateOnce = true
     }
 
+    /** Clears all apps that were temporarily unlocked via PIN. */
+    fun clearAllTemporarilyAllowed() {
+        temporarilyAllowed.clear()
+    }
+
 }
