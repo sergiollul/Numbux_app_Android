@@ -9,6 +9,13 @@ object BlockManager {
 
     private val dismissedPackages = mutableSetOf<String>()  // 👈 NUEVO
 
+    /**
+     * Check if the user has temporarily unlocked this app by entering the PIN.
+     */
+    fun isTemporarilyAllowed(packageName: String): Boolean {
+        return temporarilyAllowed.contains(packageName)
+    }
+
     fun resetFirstEvent() {
         firstEventSkipped = false
     }

@@ -50,6 +50,12 @@ class AppBlockerService : AccessibilityService() {
             return
         }
 
+        // 🚦 Si el usuario ya desbloqueó esta app con PIN, omitimos cualquier bloqueo adicional
+        if (BlockManager.isTemporarilyAllowed(packageName)) {
+            Log.d("Numbux", "✅ App $packageName desbloqueada temporalmente, omitiendo bloqueo")
+            return
+        }
+
         // ✅ Si el usuario está en el launcher, limpiar los dismissed
         if (packageName == getDefaultLauncherPackage(this)) {
             Log.d("Numbux", "🏠 Usuario en el launcher, reseteando dismissedPackages")
