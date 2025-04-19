@@ -59,4 +59,5 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1") // ← Esto es esencial
     implementation("com.google.android.material:material:1.11.0") // ← Tema Material3/XML
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    implementation("androidx.preference:preference-ktx:1.1.1")
 }

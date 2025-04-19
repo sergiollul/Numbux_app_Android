@@ -1,6 +1,5 @@
 package com.example.numbux
 
-import com.example.numbux.accessibility.AppBlockerService
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -8,134 +7,152 @@ import android.os.Bundle
 import android.provider.Settings
 import android.text.TextUtils
 import android.util.Log
+import android.app.AlertDialog
+
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+
+// ===== Compose + State imports =====
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+
+// ===== Preferences =====
+import androidx.preference.PreferenceManager
+
+import com.example.numbux.accessibility.AppBlockerService
 import com.example.numbux.ui.PinActivity
 import com.example.numbux.ui.theme.NumbuxTheme
 import com.example.numbux.utils.getDefaultLauncherPackage
 import com.example.numbux.control.BlockManager
-import android.app.AlertDialog
-
 
 class MainActivity : ComponentActivity() {
 
+    // No-arg version for our internal check
     private fun isAccessibilityServiceEnabled(): Boolean {
-        val expectedComponentName = ComponentName(this, AppBlockerService::class.java)
-        val enabledServices = Settings.Secure.getString(
+        val expected = ComponentName(this, AppBlockerService::class.java).flattenToString()
+        val enabled = Settings.Secure.getString(
             contentResolver,
             Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
         ) ?: return false
 
-        val colonSplitter = TextUtils.SimpleStringSplitter(':')
-        colonSplitter.setString(enabledServices)
-
-        for (component in colonSplitter) {
-            if (ComponentName.unflattenFromString(component) == expectedComponentName) {
-                return true
-            }
+        val splitter = TextUtils.SimpleStringSplitter(':').apply {
+            setString(enabled)
         }
-
-        return false
+        return splitter.any { it.equals(expected, ignoreCase = true) }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // —————— 1) Mandatory Android setup BEFORE Compose ——————
+
+        // Overlay permission
         if (!Settings.canDrawOverlays(this)) {
-            val intent = Intent(
-                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                android.net.Uri.parse("package:$packageName")
+            startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    android.net.Uri.parse("package:$packageName")
+                )
             )
-            startActivity(intent)
-            return // ⚠️ detenemos para evitar continuar sin permiso
+            finish() // stop here until they grant it
+            return
         }
 
+        // Edge‑to‑edge
         enableEdgeToEdge()
         Log.d("Numbux", "✅ MainActivity arrancó correctamente")
 
-        // 👉 Bloqueo de apps al iniciar
-        val launcherPackage = getDefaultLauncherPackage(this)
-        val whitelist = mutableListOf(
+        // BlockManager initial whitelist
+        val launcher = getDefaultLauncherPackage(this)
+        BlockManager.setBlockedAppsExcept(this, listOf(
             packageName,
             "com.android.settings",
             "com.android.systemui",
-            "com.android.inputmethod.latin",
-            "com.google.android.inputmethod.latin",
-            "com.samsung.android.inputmethod",
-            "com.miui.securitycenter"
-        )
+            // …
+        ).let {
+            if (launcher != null) it + launcher else it
+        })
+        Log.d("Numbux", "📋 Apps bloqueadas: ${BlockManager.getBlockedAppsDebug()}")
 
-        launcherPackage?.let {
-            whitelist.add(it)
-        }
-
-        BlockManager.setBlockedAppsExcept(this, whitelist)
-        Log.d("Numbux", "📋 Apps bloqueadas (desde MainActivity): ${BlockManager.getBlockedAppsDebug()}")
-
-        // 🛡️ Vigilancia de accesibilidad
-        if (!isAccessibilityServiceEnabled(this, "com.example.numbux.accessibility.AppBlockerService")) {
-            Log.w("Numbux", "⚠️ Servicio de accesibilidad desactivado")
-
-            val builder = AlertDialog.Builder(this)
-            builder.setTitle("Activar Accesibilidad")
-            builder.setMessage("Para que Numbux funcione correctamente, ve a 'Apps instaladas'. Después 'Numbux' y actívalo.")
-            builder.setPositiveButton("Entendido") { _, _ ->
-                // 🔁 Redirige a la pantalla de Accesibilidad
-                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                startActivity(intent)
-            }
-            builder.setCancelable(false)
-            builder.show()
+        // Accessibility alert
+        if (!isAccessibilityServiceEnabled()) {
+            AlertDialog.Builder(this)
+                .setTitle("Activar Accesibilidad")
+                .setMessage("Para que Numbux funcione correctamente, ve a 'Apps instaladas'. Después 'Numbux' y actívalo.")
+                .setPositiveButton("Entendido") { _, _ ->
+                    startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                }
+                .setCancelable(false)
+                .show()
         } else {
             Log.d("Numbux", "🟢 Accesibilidad activa")
         }
 
+        // —————— 2) Now call Compose once, and only Compose code inside ——————
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
         setContent {
+            // ① Compose state backed by prefs
+            var blockingEnabled by rememberSaveable {
+                mutableStateOf(prefs.getBoolean("blocking_enabled", true))
+            }
+
             NumbuxTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    MainScreen(modifier = Modifier.padding(innerPadding))
+                Scaffold { innerPadding ->
+                    MainScreen(
+                        modifier = Modifier.padding(innerPadding),
+                        blockingEnabled = blockingEnabled,
+                        onToggleBlocking = { newValue ->
+                            blockingEnabled = newValue
+                            prefs.edit().putBoolean("blocking_enabled", newValue).apply()
+                        }
+                    )
                 }
             }
         }
     }
-
-    // ✅ Función de vigilancia de accesibilidad
-    private fun isAccessibilityServiceEnabled(context: Context, serviceName: String): Boolean {
-        val expectedComponentName = ComponentName(context, serviceName).flattenToString()
-        val enabledServices = Settings.Secure.getString(
-            context.contentResolver,
-            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-        ) ?: return false
-
-        val splitter = TextUtils.SimpleStringSplitter(':')
-        splitter.setString(enabledServices)
-        return splitter.any { it.equals(expectedComponentName, ignoreCase = true) }
-    }
 }
 
-@Composable
-fun MainScreen(modifier: Modifier = Modifier) {
-    val context = LocalContext.current
 
+// ————— Composable UI —————
+@Composable
+fun MainScreen(
+    modifier: Modifier = Modifier,
+    blockingEnabled: Boolean,
+    onToggleBlocking: (Boolean) -> Unit
+) {
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp),
+        modifier = modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         Text("Bienvenido a Numbux", style = MaterialTheme.typography.headlineSmall)
-        Text("Este dispositivo está siendo monitoreado por los padres.")
 
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Bloqueo de apps")
+            Switch(
+                checked = blockingEnabled,
+                onCheckedChange = onToggleBlocking
+            )
+        }
+        Text(
+            if (blockingEnabled) "El bloqueador está ACTIVADO"
+            else                   "El bloqueador está DESACTIVADO",
+            style = MaterialTheme.typography.bodyMedium
+        )
+
+        val ctx = LocalContext.current
         Button(onClick = {
-            val intent = Intent(context, PinActivity::class.java)
-            context.startActivity(intent)
+            ctx.startActivity(Intent(ctx, PinActivity::class.java))
         }) {
             Text("Abrir pantalla de PIN")
         }
@@ -146,6 +163,9 @@ fun MainScreen(modifier: Modifier = Modifier) {
 @Composable
 fun MainScreenPreview() {
     NumbuxTheme {
-        MainScreen()
+        MainScreen(
+            blockingEnabled = true,
+            onToggleBlocking = { }
+        )
     }
 }

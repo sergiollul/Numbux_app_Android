@@ -13,11 +13,19 @@ import com.example.numbux.ui.PinActivity
 import com.example.numbux.utils.getDefaultLauncherPackage
 import com.example.numbux.utils.getAllInstalledAppPackages
 import com.example.numbux.overlay.OverlayBlockerService
+import androidx.preference.PreferenceManager
+
 
 class AppBlockerService : AccessibilityService() {
     private var lastPackage: String? = null
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
+
+        val enabled = PreferenceManager
+            .getDefaultSharedPreferences(this)
+            .getBoolean("blocking_enabled", true)
+        if (!enabled) return
+
         // 1️⃣ Evita procesar eventos antes de estar listo
         if (!BlockManager.isAccessibilityServiceInitialized()) {
             Log.d("Numbux", "⏳ Servicio aún no inicializado completamente. Ignorando evento.")
@@ -160,7 +168,7 @@ class AppBlockerService : AccessibilityService() {
                 }, 5_000) // un poco más largo para asegurar que el usuario vea el PIN
             }
         }
-        
+
         // Fallback: si detectamos botón desactivar
         if (packageName == "com.android.settings" && event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             val rootNode = rootInActiveWindow ?: return
