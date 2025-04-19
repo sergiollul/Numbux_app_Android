@@ -85,6 +85,11 @@ class AppBlockerService : AccessibilityService() {
 
         // 9️⃣ Detección de diálogo de desinstalación
         if (esPantallaDeDesinstalacion(className, packageName)) {
+            // 🔓 Si ya permitimos la desinstalación con PIN, saltarnos el prompt
+            if (BlockManager.isTemporarilyAllowed(packageName)) {
+                Log.d("Numbux", "🔓 Desinstalación de $packageName ya permitida, no pedimos PIN de nuevo")
+                return
+            }
             Log.d("Numbux", "⚠️ Intento de desinstalación detectado: $className")
             if (!BlockManager.isShowingPin) {
                 mostrarOverlaySobreBotonDesactivar()
