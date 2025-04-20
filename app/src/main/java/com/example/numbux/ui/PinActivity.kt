@@ -8,12 +8,11 @@ import android.widget.Toast
 import com.example.numbux.R
 import com.example.numbux.control.BlockManager
 import android.util.Log
-import android.content.Intent
 import android.view.MotionEvent // ← Required for dispatchTouchEvent
 import android.view.WindowManager
 import android.graphics.Rect
 import android.view.View
-import com.example.numbux.overlay.OverlayBlockerService
+
 
 
 
@@ -36,9 +35,6 @@ class PinActivity : Activity() {
                     BlockManager.allowTemporarily(appPackage)
                     Toast.makeText(this, "App desbloqueada temporalmente", Toast.LENGTH_SHORT).show()
                 }
-
-                // ✅ Apagar el overlay al ingresar el PIN correcto
-                stopService(Intent(this, com.example.numbux.overlay.OverlayBlockerService::class.java))
 
                 setResult(Activity.RESULT_OK)
                 BlockManager.isShowingPin = false
@@ -80,16 +76,12 @@ class PinActivity : Activity() {
         super.onPause()
         Log.d("Numbux", "🛑 PinActivity -> onPause")
         BlockManager.isShowingPin = false
-
-        // 🧹 Asegurarnos de que no quede ningún overlay bloqueando toques
-        stopService(Intent(this, OverlayBlockerService::class.java))
     }
 
     override fun onDestroy() {
         super.onDestroy()
         Log.d("Numbux", "💀 PinActivity -> onDestroy")
         BlockManager.isShowingPin = false
-        stopService(Intent(this, OverlayBlockerService::class.java))
 
         val appPackage = intent.getStringExtra("app_package")
         if (!appPackage.isNullOrEmpty()) {

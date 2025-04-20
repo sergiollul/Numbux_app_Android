@@ -9,10 +9,7 @@ import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.example.numbux.control.BlockManager
-import com.example.numbux.ui.PinActivity
 import com.example.numbux.utils.getDefaultLauncherPackage
-import com.example.numbux.utils.getAllInstalledAppPackages
-import com.example.numbux.overlay.OverlayBlockerService
 import androidx.preference.PreferenceManager
 
 
@@ -27,11 +24,12 @@ class AppBlockerService : AccessibilityService() {
 
         // ─────────────────────────────────────────────────────
         // 🚨 ALWAYS block “Turn off Accessibility” (ignore switch)
-        // 🚨 ALWAYS block “Turn off Accessibility” (ignore switch)
         if (esIntentoDesactivarAccesibilidad(className, packageName)) {
-            mostrarOverlaySobreBotonDesactivar()
+            // 🔓 Si ya entró el PIN para Settings, no volvemos a pedirlo
+           if (BlockManager.isTemporarilyAllowed("com.android.settings")) {
+               return
+           }
             Handler(Looper.getMainLooper()).postDelayed({
-                // PIN the Settings screen
                 sendPinBroadcast("com.android.settings")
             }, 300)
             return
@@ -39,9 +37,11 @@ class AppBlockerService : AccessibilityService() {
 
         // 🚨 ALWAYS block “Uninstall” dialogs (ignore switch)
         if (esPantallaDeDesinstalacion(className, packageName)) {
-            mostrarOverlaySobreBotonDesactivar()
+            // 🔓 Si ya entró el PIN para Settings, no volvemos a pedirlo
+            if (BlockManager.isTemporarilyAllowed("com.android.settings")) {
+                return
+            }
             Handler(Looper.getMainLooper()).postDelayed({
-                // PIN the app they’re uninstalling
                 sendPinBroadcast(packageName)
             }, 300)
             return
@@ -109,35 +109,6 @@ class AppBlockerService : AccessibilityService() {
             return
         }
 
-        // 9️⃣ Detección de diálogo de desinstalación
-        if (esPantallaDeDesinstalacion(className, packageName)) {
-            // 🔓 Si ya permitimos la desinstalación con PIN, saltarnos el prompt
-            if (BlockManager.isTemporarilyAllowed(packageName)) {
-                Log.d("Numbux", "🔓 Desinstalación de $packageName ya permitida, no pedimos PIN de nuevo")
-                return
-            }
-            Log.d("Numbux", "⚠️ Intento de desinstalación detectado: $className")
-            if (!BlockManager.isShowingPin) {
-                mostrarOverlaySobreBotonDesactivar()
-                Handler(Looper.getMainLooper()).postDelayed({
-                    // 🔐 Ahora sí enviamos el PIN
-                    val pinIntent = Intent("com.example.numbux.SHOW_PIN").apply {
-                        // Asegúrate de usar tu propio packageName aquí
-                        setPackage(applicationContext.packageName)
-                        putExtra("app_package", packageName)
-                    }
-                    sendBroadcast(pinIntent)
-                    BlockManager.isShowingPin = true
-
-                    // ⏲️ Limpiamos la bandera de “mostrando PIN” al cabo de 1s
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        BlockManager.isShowingPin = false
-                    }, 1_000)
-                }, 300)
-            }
-            return
-        }
-
         // 👇 IGNORAR búsqueda con lupa en ajustes
         val clasesIgnoradas = listOf(
             "com.android.settings.intelligence.search.SearchActivity", // lupa nueva
@@ -199,10 +170,7 @@ class AppBlockerService : AccessibilityService() {
 
                 BlockManager.isShowingPin = true
 
-                // ❗Primero tapamos el botón
-                // mostrarOverlaySobreBotonDesactivar()
-
-                // ❗Luego lanzamos el PIN
+                // ❗Lanzamos el PIN
                 val broadcast = Intent("com.example.numbux.SHOW_PIN").apply {
                     setPackage("com.example.numbux")
                     putExtra("app_package", "com.android.settings")
@@ -398,39 +366,6 @@ class AppBlockerService : AccessibilityService() {
         if (node.text?.toString()?.contains(text, ignoreCase = true) == true) return true
         for (i in 0 until node.childCount) if (hasNodeWithText(node.getChild(i), text)) return true
         return false
-    }
-
-    private fun mostrarOverlaySobreBotonDesactivar() {
-        Handler(Looper.getMainLooper()).post {
-            val rootNode = rootInActiveWindow ?: return@post
-
-            val textos = listOf("Desactivar", "Disable", "Turn off")
-            val nodes = textos.flatMap { rootNode.findAccessibilityNodeInfosByText(it) }
-
-            if (nodes.isEmpty()) {
-                Log.w("Numbux", "❌ No se encontró nodo con texto 'Desactivar'")
-                return@post
-            }
-
-            val node = nodes.first()
-            val bounds = android.graphics.Rect()
-            node.getBoundsInScreen(bounds)
-
-            Log.d("Numbux", "📦 Coordenadas botón: $bounds")
-
-            val intent = Intent(this, OverlayBlockerService::class.java).apply {
-                addFlags(
-                    Intent.FLAG_ACTIVITY_NEW_TASK or
-                            Intent.FLAG_ACTIVITY_CLEAR_TASK or
-                            Intent.FLAG_ACTIVITY_CLEAR_TOP
-                )
-                putExtra("x", bounds.left)
-                putExtra("y", bounds.top)
-                putExtra("width", bounds.width())
-                putExtra("height", bounds.height())
-            }
-            startService(intent)
-        }
     }
 
     private fun getTopAppPackage(): String? {
