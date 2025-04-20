@@ -89,7 +89,7 @@ class MainActivity : ComponentActivity() {
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
         setContent {
             var blockingEnabled by rememberSaveable {
-                mutableStateOf(prefs.getBoolean("blocking_enabled", true))
+                mutableStateOf(prefs.getBoolean("blocking_enabled", false))
             }
 
             NumbuxTheme {
