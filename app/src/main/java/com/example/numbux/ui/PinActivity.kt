@@ -13,10 +13,6 @@ import android.view.WindowManager
 import android.graphics.Rect
 import android.view.View
 
-
-
-
-
 class PinActivity : Activity() {
 
     private val correctPin = "1234" // Puedes vincular esto a Firebase después
@@ -44,7 +40,6 @@ class PinActivity : Activity() {
             }
         }
 
-        // ✅ Prevent interaction with buttons behind the dialog
         window.addFlags(
             WindowManager.LayoutParams.FLAG_FULLSCREEN or
                     WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
@@ -54,18 +49,14 @@ class PinActivity : Activity() {
         )
     }
 
-    // ✅ This consumes all touch events so nothing passes through
     override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
         val pinLayout = findViewById<View>(R.id.pinLayoutRoot) // <- your main container
         if (pinLayout != null) {
             val rect = Rect()
             pinLayout.getGlobalVisibleRect(rect)
             if (rect.contains(ev?.rawX?.toInt() ?: 0, ev?.rawY?.toInt() ?: 0)) {
-                // Touch is inside the PIN UI, allow it
                 return super.dispatchTouchEvent(ev)
             } else {
-                // Touch is outside, consume it
-                Log.d("Numbux", "❌ Tap fuera del PIN bloqueado")
                 return true
             }
         }
@@ -74,23 +65,19 @@ class PinActivity : Activity() {
 
     override fun onPause() {
         super.onPause()
-        Log.d("Numbux", "🛑 PinActivity -> onPause")
         BlockManager.isShowingPin = false
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.d("Numbux", "💀 PinActivity -> onDestroy")
         BlockManager.isShowingPin = false
 
         val appPackage = intent.getStringExtra("app_package")
         if (!appPackage.isNullOrEmpty()) {
             BlockManager.dismissUntilAppChanges(appPackage)
-            Log.d("Numbux", "❌ PIN rechazado para $appPackage (temporalmente ignorado)")
         }
     }
 
     override fun onBackPressed() {
-        // No permitir cerrar con back
     }
 }

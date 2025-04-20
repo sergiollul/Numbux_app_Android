@@ -13,7 +13,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 
-// ===== Compose + State imports =====
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,7 +26,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 
-// ===== Preferences =====
 import androidx.preference.PreferenceManager
 
 import com.example.numbux.accessibility.AppBlockerService
@@ -38,7 +36,6 @@ import com.example.numbux.control.BlockManager
 
 class MainActivity : ComponentActivity() {
 
-    // No-arg version for our internal check
     private fun isAccessibilityServiceEnabled(): Boolean {
         val expected = ComponentName(this, AppBlockerService::class.java).flattenToString()
         val enabled = Settings.Secure.getString(
@@ -55,9 +52,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // —————— 1) Mandatory Android setup BEFORE Compose ——————
-
-        // Overlay permission
         if (!Settings.canDrawOverlays(this)) {
             startActivity(
                 Intent(
@@ -69,23 +63,17 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        // Edge‑to‑edge
         enableEdgeToEdge()
-        Log.d("Numbux", "✅ MainActivity arrancó correctamente")
 
-        // BlockManager initial whitelist
         val launcher = getDefaultLauncherPackage(this)
         BlockManager.setBlockedAppsExcept(this, listOf(
             packageName,
             "com.android.settings",
             "com.android.systemui",
-            // …
         ).let {
             if (launcher != null) it + launcher else it
         })
-        Log.d("Numbux", "📋 Apps bloqueadas: ${BlockManager.getBlockedAppsDebug()}")
 
-        // Accessibility alert
         if (!isAccessibilityServiceEnabled()) {
             AlertDialog.Builder(this)
                 .setTitle("Activar Accesibilidad")
@@ -96,13 +84,10 @@ class MainActivity : ComponentActivity() {
                 .setCancelable(false)
                 .show()
         } else {
-            Log.d("Numbux", "🟢 Accesibilidad activa")
         }
 
-        // —————— 2) Now call Compose once, and only Compose code inside ——————
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
         setContent {
-            // ① Compose state backed by prefs
             var blockingEnabled by rememberSaveable {
                 mutableStateOf(prefs.getBoolean("blocking_enabled", true))
             }
@@ -113,12 +98,10 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.padding(innerPadding),
                         blockingEnabled = blockingEnabled,
                         onToggleBlocking = { newValue ->
-                            // 1️⃣ update Compose state & prefs
                             blockingEnabled = newValue
                             prefs.edit().putBoolean("blocking_enabled", newValue).apply()
 
                             if (newValue) {
-                                // 🎉 Just turned blocking back ON → reset any old PIN overrides
                                 BlockManager.clearAllDismissed()
                                 BlockManager.clearAllTemporarilyAllowed()
                             }
@@ -130,8 +113,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-
-// ————— Composable UI —————
 @Composable
 fun MainScreen(
     modifier: Modifier = Modifier,

@@ -9,11 +9,9 @@ fun getAllInstalledAppPackages(context: Context): List<String> {
     return apps.map { it.packageName }
 }
 
-
 fun getDefaultLauncherPackage(context: Context): String? {
     val intent = Intent(Intent.ACTION_MAIN)
     intent.addCategory(Intent.CATEGORY_HOME)
     val res = context.packageManager.resolveActivity(intent, 0)
     return res?.activityInfo?.packageName
 }
-

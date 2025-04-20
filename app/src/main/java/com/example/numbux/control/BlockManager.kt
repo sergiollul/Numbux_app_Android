@@ -53,8 +53,6 @@ object BlockManager {
         val appsToBlock = allApps.filterNot { whitelist.contains(it) }
         blockedApps.clear()
         blockedApps.addAll(appsToBlock)
-        Log.d("Numbux", "🔐 setBlockedAppsExcept(): whitelist=$whitelist")
-        Log.d("Numbux", "🔐 setBlockedAppsExcept(): appsToBlock=$appsToBlock")
     }
 
     fun getBlockedAppsDebug(): Set<String> {
@@ -81,7 +79,6 @@ object BlockManager {
         return accessibilityServiceInitialized
     }
 
-    // 🔁 Nueva lógica: solo ignora PIN mientras no cambie de app
     fun dismissUntilAppChanges(packageName: String) {
         dismissedPackages.add(packageName)
     }
@@ -104,7 +101,6 @@ object BlockManager {
         }
     }
 
-    // ⏱️ Control de tiempo opcional (mantener por si se quiere usar luego)
     private var lastPinShownTime: Long = 0
 
     fun shouldShowPin(): Boolean {
@@ -120,7 +116,6 @@ object BlockManager {
         dismissedPackages.clear()
     }
 
-    // ⚡ Forzar evaluación de evento aunque no cambie de paquete
     private var forceEvaluateOnce = false
 
     fun shouldForceEvaluate(): Boolean {
