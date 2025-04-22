@@ -104,6 +104,11 @@ class MainActivity : ComponentActivity() {
                             if (newValue) {
                                 BlockManager.clearAllDismissed()
                                 BlockManager.clearAllTemporarilyAllowed()
+
+                                BlockManager.setBlockedAppsExcept(
+                                    applicationContext,
+                                    listOf( getDefaultLauncherPackage(this)!! )
+                                )
                             }
                         }
                     )
