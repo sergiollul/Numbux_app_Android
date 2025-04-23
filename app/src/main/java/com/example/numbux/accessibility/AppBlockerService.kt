@@ -3,210 +3,240 @@ package com.example.numbux.accessibility
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Intent
+import android.content.SharedPreferences
+import android.graphics.PixelFormat
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.View
+import android.view.WindowManager
+import android.view.WindowManager.LayoutParams
 import android.view.accessibility.AccessibilityEvent
-import android.view.accessibility.AccessibilityNodeInfo
 import androidx.preference.PreferenceManager
 import com.example.numbux.control.BlockManager
+import com.example.numbux.ui.PinActivity
 import com.example.numbux.utils.getDefaultLauncherPackage
 
 class AppBlockerService : AccessibilityService() {
+
+    // Keep track of our overlay and last package seen
+    private var touchBlocker: View? = null
     private var lastPackage: String? = null
-    private var lastKnownToggle: Boolean = false
+
+    // SharedPreferences + listener to reset state when blocking is turned back on
+    private lateinit var prefs: SharedPreferences
+    private val prefListener =
+        SharedPreferences.OnSharedPreferenceChangeListener { shared, key ->
+            if (key == "blocking_enabled" && shared.getBoolean(key, true)) {
+                Log.d("Numbux", "[DEBUG] blocking re-enabled → clearing state")
+                BlockManager.clearAllTemporarilyAllowed()
+                BlockManager.clearAllDismissed()
+            }
+        }
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+
+        prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        if (!prefs.getBoolean("blocking_enabled", true)) return
+
+        prefs.registerOnSharedPreferenceChangeListener(prefListener)
+
+        serviceInfo = AccessibilityServiceInfo().apply {
+            eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
+                    AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED or
+                    AccessibilityEvent.TYPE_WINDOWS_CHANGED
+            feedbackType        = AccessibilityServiceInfo.FEEDBACK_GENERIC
+            notificationTimeout = 0
+            packageNames        = null
+        }
+
+        initializeBlockList()
+    }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
-        // only care about full window changes
-        if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+        val pkg  = event.packageName?.toString() ?: return
+        val cls  = event.className?.toString()   ?: ""
+        val type = event.eventType
+
+        // DEBUG: log every Settings event
+        if (pkg.startsWith("com.android.settings")) {
+            Log.d("Numbux", "⚙️ SETTINGS EVT: pkg=$pkg, cls=$cls, type=$type, texts=${event.text}")
+        }
+
+        // 1) Block uninstall dialog as soon as it opens
+        if (pkg in uninstallPackages
+            && !BlockManager.isTemporarilyAllowed(pkg)
+            && type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            val timeoutMs = prefs.getString("key_uninstall_block_timeout","3000")
+                ?.toLongOrNull() ?: 3000L
+            Log.d("Numbux","[DEBUG] uninstall-state → block $timeoutMs")
+            blockAllTouchesFor(timeoutMs)
+        }
+
+        // 2) Dismiss uninstall + show PIN
+        if (pkg in uninstallPackages
+            && !BlockManager.isTemporarilyAllowed(pkg)
+            && (type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ||
+                type == AccessibilityEvent.TYPE_WINDOWS_CHANGED)
+        ) {
+            performGlobalAction(GLOBAL_ACTION_BACK)
+            // still not unlocked? show PIN again
+            startActivity(
+                Intent(this, PinActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    putExtra("app_package", pkg)
+                    }
+            )
             return
         }
 
-        // -- detect toggle changes and reload block list when switched ON/OFF --
-        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
-        val isNowEnabled = prefs.getBoolean("blocking_enabled", false)
-        if (isNowEnabled && !lastKnownToggle) {
-            lastKnownToggle = true
-            initializeBlockList()
-        } else if (!isNowEnabled && lastKnownToggle) {
-            lastKnownToggle = false
-            BlockManager.clearAllTemporarilyAllowed()
-            BlockManager.clearAllDismissed()
-            getDefaultLauncherPackage(this)?.let {
-                BlockManager.setBlockedAppsExcept(this, listOf(it))
-            }
-        }
+        // 3) PIN-protect turning Accessibility OFF until they unlock
+        if (esIntentoDesactivarAccesibilidad(cls, pkg) &&
+            !BlockManager.isTemporarilyAllowed(pkg) &&
+            type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+        ) {
+            val timeoutMs = prefs.getString("key_uninstall_block_timeout","3000")
+                ?.toLongOrNull() ?: 3000L
+            Log.d("Numbux","[DEBUG] disable-acc-state → block $timeoutMs")
+            blockAllTouchesFor(timeoutMs)
 
-        val className   = event.className?.toString() ?: ""
-        val packageName = event.packageName?.toString() ?: return
+            Log.d("Numbux","[DEBUG] disable-acc-state → BACK")
+            performGlobalAction(GLOBAL_ACTION_BACK)
 
-        Log.d("Numbux", "Event → pkg=$packageName, cls=$className, type=${event.eventType}")
-
-        // 1) ALWAYS protect the 'turn‑off‑accessibility' dialog
-        if (esIntentoDesactivarAccesibilidad(className, packageName)) {
-            if (!BlockManager.isTemporarilyAllowed(packageName)) {
-                Handler(Looper.getMainLooper()).postDelayed({
-                    sendPinBroadcast(packageName)
-                }, 300)
-            }
+            Log.d("Numbux","[DEBUG] disable-acc-state → PIN")
+            startActivity(Intent(this, PinActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                putExtra("app_package", pkg)
+            })
             return
         }
 
-        // 2) ALWAYS protect the uninstall screen
-        if (esPantallaDeDesinstalacion(className, packageName)) {
-            if (!BlockManager.isTemporarilyAllowed(packageName)) {
-                Handler(Looper.getMainLooper()).postDelayed({
-                    sendPinBroadcast(packageName)
-                }, 300)
-            }
-            return
-        }
+        // 4) Now safe to skip Settings UI
+        if (pkg.startsWith("com.android.settings")) return
 
-        // 3) Skip *all* Settings UIs (core and intelligence/search)
-        if (packageName.startsWith("com.android.settings")) {
-            return
-        }
+        // 5) Skip System UI & Samsung overlays
+        if (pkg == "com.android.systemui" ||
+            pkg.startsWith("com.samsung.android.spay") ||
+            pkg.startsWith("com.samsung.android.honeyboard")
+        ) return
 
-        // 4) Skip all the System UI overlays (status bar, nav bar, keyboard, etc.)
-        if (packageName == "com.android.systemui") {
-            return
-        }
+        // 6) Respect the master toggle
+        if (!prefs.getBoolean("blocking_enabled", true)) return
 
-        // Skip Samsung payment/keyboard packages as well:
-        if (packageName.startsWith("com.samsung.android.spay")
-            || packageName.startsWith("com.samsung.android.honeyboard")) {
-            return
-        }
-
-
-
-        // Now respect the on/off toggle for every other app
-        if (!prefs.getBoolean("blocking_enabled", true)) {
-            return
-        }
-
-        // Ignore the launcher itself
+        // 7) Ignore launcher itself
         getDefaultLauncherPackage(this)?.let { launcher ->
-            if (packageName == launcher) return
+            if (pkg == launcher) return
         }
 
-        // Skip if user has already entered PIN for this package
-        if (BlockManager.isTemporarilyAllowed(packageName)) {
-            return
-        }
+        // 8) If they’ve already unlocked this app, don’t PIN again
+        if (BlockManager.isTemporarilyAllowed(pkg)) return
 
-        // On launcher → clear dismissed packages so they re‑block next time
+        // 9) On returning to launcher, clear manual dismissals
         getDefaultLauncherPackage(this)?.let { launcher ->
-            if (packageName == launcher) {
+            if (pkg == launcher) {
                 BlockManager.clearAllDismissed()
                 return
             }
         }
 
-        // If package changed, reset any per‑app dismissals
-        if (packageName != lastPackage) {
-            if (BlockManager.isDismissed(packageName)) {
-                BlockManager.clearDismissed(packageName)
+        // 10) Reset per-app dismissals when switching apps
+        if (pkg != lastPackage) {
+            if (BlockManager.isDismissed(pkg)) {
+                BlockManager.clearDismissed(pkg)
             }
-            BlockManager.resetAllDismissedIfPackageChanged(packageName)
+            BlockManager.resetAllDismissedIfPackageChanged(pkg)
         }
-        lastPackage = packageName
+        lastPackage = pkg
 
-        // Never block your own PIN activity
-        if (className.contains("PinActivity", ignoreCase = true)
-            || packageName == applicationContext.packageName
-        ) {
-            return
-        }
+        // 11) Never block your own PIN Activity
+        if (cls.contains("PinActivity", ignoreCase = true) ||
+            pkg == applicationContext.packageName
+        ) return
 
-        // If user temporarily dismissed this app, skip it
-        if (BlockManager.isDismissed(packageName)) {
-            return
-        }
+        // 12) Skip apps the user manually dismissed
+        if (BlockManager.isDismissed(pkg)) return
 
-        // Finally—delay then show PIN if it's a blocked app on screen
+        // 13) Finally: show PIN for blocked apps
         Handler(Looper.getMainLooper()).postDelayed({
-            val currentPackage = try {
-                rootInActiveWindow?.packageName
-            } catch (e: Exception) {
-                Log.w("Numbux", "Error reading rootInActiveWindow: ${e.message}")
-                null
-            }
-
-            if (currentPackage == packageName && BlockManager.isAppBlocked(packageName)) {
-                val broadcast = Intent("com.example.numbux.SHOW_PIN").apply {
-                    setPackage(applicationContext.packageName)
-                    putExtra("app_package", packageName)
-                }
-                sendBroadcast(broadcast)
-                BlockManager.markPinShown()
+            val current = runCatching { rootInActiveWindow?.packageName }.getOrNull()
+            if (current == pkg && BlockManager.isAppBlocked(pkg)
+                && !BlockManager.isTemporarilyAllowed(pkg)
+            ) {
+                sendPinBroadcast(pkg)
             }
         }, 200)
     }
 
+    override fun onInterrupt() { /* no-op */ }
 
-    override fun onInterrupt() {}
-
-    override fun onServiceConnected() {
-        super.onServiceConnected()
-        // only initialize if toggle is ON
-        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
-        if (!prefs.getBoolean("blocking_enabled", false)) return
-
-        // configure service
-        val info = AccessibilityServiceInfo().apply {
-            eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
-            feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
-            packageNames = null
-        }
-        serviceInfo = info
-
-        // initial block list
-        initializeBlockList()
+    override fun onDestroy() {
+        super.onDestroy()
+        prefs.unregisterOnSharedPreferenceChangeListener(prefListener)
     }
 
-    /** Build or rebuild the block-list from preferences and defaults */
+    // ─────────────────────────────────────────────────────────────────
+    // Core helper: overlay a full-screen view that eats all touches
+    private fun blockAllTouchesFor(ms: Long) {
+        if (touchBlocker != null) return
+
+        val wm = getSystemService(WINDOW_SERVICE) as WindowManager
+        val windowType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+        } else {
+            LayoutParams.TYPE_PHONE
+        }
+
+        touchBlocker = View(this).apply {
+            setOnTouchListener { _, _ -> true }
+        }
+        val lp = LayoutParams(
+            LayoutParams.MATCH_PARENT,
+            LayoutParams.MATCH_PARENT,
+            windowType,
+            LayoutParams.FLAG_NOT_FOCUSABLE or
+                    LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                    LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        )
+
+        wm.addView(touchBlocker, lp)
+        Handler(Looper.getMainLooper()).postDelayed({
+            touchBlocker?.let {
+                wm.removeView(it)
+                touchBlocker = null
+            }
+        }, ms)
+    }
+
+    // ─────────────────────────────────────────────────────────────────
     private fun initializeBlockList() {
-        // reset
         BlockManager.clearAllTemporarilyAllowed()
         BlockManager.clearAllDismissed()
         BlockManager.resetFirstEvent()
 
-        // build whitelist
-        val whitelist = mutableListOf(
-            applicationContext.packageName,
-            "com.android.settings",
-            "com.android.systemui",
-            "com.android.inputmethod.latin",
-            "com.google.android.inputmethod.latin"
-        )
-        getDefaultLauncherPackage(this)?.let { whitelist.add(it) }
-        // allow installer UIs
-        whitelist.addAll(uninstallPackages)
-
+        val whitelist = mutableListOf<String>().apply {
+            add(applicationContext.packageName)
+            add("com.android.settings")
+            add("com.android.systemui")
+            add("com.android.inputmethod.latin")
+            add("com.google.android.inputmethod.latin")
+            getDefaultLauncherPackage(this@AppBlockerService)?.let { add(it) }
+            addAll(uninstallPackages)
+        }
         BlockManager.setBlockedAppsExcept(this, whitelist)
         BlockManager.markAccessibilityServiceInitialized()
     }
 
-    private fun sendPinBroadcast(appPackage: String) {
-        val pinIntent = Intent("com.example.numbux.SHOW_PIN").apply {
-            setPackage(applicationContext.packageName)
-            putExtra("app_package", appPackage)
+    private fun sendPinBroadcast(appPkg: String) {
+        Intent("com.example.numbux.SHOW_PIN").also { intent ->
+            intent.setPackage(applicationContext.packageName)
+            intent.putExtra("app_package", appPkg)
+            sendBroadcast(intent)
         }
-        sendBroadcast(pinIntent)
         BlockManager.isShowingPin = true
-    }
-
-    private fun hasNodeWithText(node: AccessibilityNodeInfo?, text: String): Boolean {
-        if (node == null) return false
-        if (node.text?.toString()?.contains(text, ignoreCase = true) == true) return true
-        for (i in 0 until node.childCount) if (hasNodeWithText(node.getChild(i), text)) return true
-        return false
-    }
-
-    private fun getTopAppPackage(): String? {
-        val am = getSystemService(ACTIVITY_SERVICE) as android.app.ActivityManager
-        return am.appTasks.firstOrNull()?.taskInfo?.topActivity?.packageName
     }
 
     private val uninstallPackages = listOf(
@@ -215,14 +245,8 @@ class AppBlockerService : AccessibilityService() {
         "com.android.permissioncontroller"
     )
 
-    private fun esPantallaDeDesinstalacion(className: String?, packageName: String?): Boolean {
-        return uninstallPackages.contains(packageName) &&
-                (className?.contains("Uninstall", true) == true ||
-                        className?.contains("Uninstaller", true) == true)
-    }
-
-    private fun esIntentoDesactivarAccesibilidad(className: String?, packageName: String?): Boolean {
-        return packageName == "com.android.settings" &&
+    private fun esIntentoDesactivarAccesibilidad(className: String?, pkg: String?): Boolean {
+        return pkg == "com.android.settings" &&
                 className?.contains("AlertDialog", ignoreCase = true) == true
     }
 }

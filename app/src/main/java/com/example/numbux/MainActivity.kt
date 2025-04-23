@@ -34,6 +34,18 @@ import com.example.numbux.ui.theme.NumbuxTheme
 import com.example.numbux.utils.getDefaultLauncherPackage
 import com.example.numbux.control.BlockManager
 
+import android.net.Uri
+
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
+import com.example.numbux.settings.SettingsActivity
+
+
+import androidx.compose.material3.ExperimentalMaterial3Api
+
+@OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
 
     private fun isAccessibilityServiceEnabled(): Boolean {
@@ -56,7 +68,7 @@ class MainActivity : ComponentActivity() {
             startActivity(
                 Intent(
                     Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    android.net.Uri.parse("package:$packageName")
+                    Uri.parse("package:$packageName")
                 )
             )
             finish() // stop here until they grant it
@@ -66,50 +78,68 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val launcher = getDefaultLauncherPackage(this)
-        BlockManager.setBlockedAppsExcept(this, listOf(
-            packageName,
-            "com.android.settings",
-            "com.android.systemui",
-        ).let {
-            if (launcher != null) it + launcher else it
-        })
+        BlockManager.setBlockedAppsExcept(
+            this,
+            listOf(
+                packageName,
+                "com.android.settings",
+                "com.android.systemui",
+            ).let {
+                if (launcher != null) it + launcher else it
+            }
+        )
 
         if (!isAccessibilityServiceEnabled()) {
             AlertDialog.Builder(this)
                 .setTitle("Activar Accesibilidad")
-                .setMessage("Para que Numbux funcione correctamente, ve a 'Apps instaladas'. Después 'Numbux' y actívalo.")
+                .setMessage(
+                    "Para que Numbux funcione correctamente, " +
+                            "ve a 'Apps instaladas'. Después 'Numbux' y actívalo."
+                )
                 .setPositiveButton("Entendido") { _, _ ->
                     startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                 }
                 .setCancelable(false)
                 .show()
-        } else {
         }
 
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        // capture the Activity for use inside the Compose lambda
+        val activity = this
+
         setContent {
             var blockingEnabled by rememberSaveable {
                 mutableStateOf(prefs.getBoolean("blocking_enabled", false))
             }
 
             NumbuxTheme {
-                Scaffold { innerPadding ->
-                    MainScreen(
-                        modifier = Modifier.padding(innerPadding),
-                        blockingEnabled = blockingEnabled,
-                        onToggleBlocking = { newValue ->
-                            blockingEnabled = newValue
-                            prefs.edit().putBoolean("blocking_enabled", newValue).apply()
-
-                            if (newValue) {
-                                BlockManager.clearAllDismissed()
-                                BlockManager.clearAllTemporarilyAllowed()
-
-                                BlockManager.setBlockedAppsExcept(
-                                    applicationContext,
-                                    listOf( getDefaultLauncherPackage(this)!! )
-                                )
+                Scaffold(
+                    topBar = {
+                        TopAppBar(
+                            title = { Text("Numbux") },
+                            actions = {
+                                IconButton(onClick = {
+                                    startActivity(
+                                        Intent(this@MainActivity, SettingsActivity::class.java)
+                                    )
+                                }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = "Settings"
+                                    )
+                                }
                             }
+                        )
+                    }
+                ) { innerPadding ->                               // <— only one lambda here!
+                    MainScreen(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding),                      // use the padding
+                        blockingEnabled = blockingEnabled,
+                        onToggleBlocking = { enabled ->
+                            prefs.edit().putBoolean("blocking_enabled", enabled).apply()
+                            blockingEnabled = enabled
                         }
                     )
                 }

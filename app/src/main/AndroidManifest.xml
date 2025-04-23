@@ -15,9 +15,11 @@
 
         <!-- Device Admin Receiver -->
         <receiver
+            android:exported="true"
             android:name=".admin.MyDeviceAdminReceiver"
-            android:permission="android.permission.BIND_DEVICE_ADMIN"
-            android:exported="true">
+            android:description="@string/device_admin_description"
+            android:label="@string/device_admin_label"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
             <meta-data
                 android:name="android.app.device_admin"
                 android:resource="@xml/device_admin_receiver" />
@@ -26,7 +28,9 @@
             </intent-filter>
         </receiver>
 
-        <receiver android:name=".StartPinReceiver" android:exported="true">
+        <receiver
+            android:name=".StartPinReceiver"
+            android:exported="true">
             <intent-filter>
                 <action android:name="com.example.numbux.SHOW_PIN"/>
             </intent-filter>
@@ -61,18 +65,29 @@
         <!-- Pin Activity -->
         <activity
             android:name=".ui.PinActivity"
-            android:theme="@style/Theme.Numbux.Fullscreen"
             android:exported="true"
+            android:launchMode="singleTask"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
             android:excludeFromRecents="true"
-            android:launchMode="singleTop"
-            android:taskAffinity=""
-            android:windowSoftInputMode="adjustResize" />
+            android:theme="@style/Theme.Numbux.PinDialog">
+        </activity>
 
+        <activity
+            android:name=".settings.SettingsActivity"
+            android:label="Settings"
+            android:parentActivityName=".MainActivity">
+            <!-- optional: add “up” navigation back to MainActivity -->
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value=".MainActivity" />
+        </activity>
     </application>
 
     <!-- Permissions -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
     <queries>
         <!-- Necesario si usas PackageManager para obtener apps instaladas -->
         <intent>

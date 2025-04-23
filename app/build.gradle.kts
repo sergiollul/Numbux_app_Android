@@ -60,4 +60,6 @@ dependencies {
     implementation("com.google.android.material:material:1.11.0") // ← Tema Material3/XML
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("androidx.preference:preference-ktx:1.1.1")
+    implementation ("androidx.compose.material:material-icons-extended:1.4.0")
+    implementation ("androidx.preference:preference-ktx:1.2.0")
 }

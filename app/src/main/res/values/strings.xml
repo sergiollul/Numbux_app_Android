@@ -1,4 +1,10 @@
 <resources>
     <string name="app_name">Numbux</string>
     <string name="accessibility_service_description">Servicio de control parental Numbux</string>
+
+    <!-- Device-admin meta -->
+    <string name="device_admin_label">Numbux Device Admin</string>
+    <string name="device_admin_description">
+        Needed to prevent users from uninstalling or disabling accessibility.
+    </string>
 </resources>

@@ -1,16 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
     <style name="Theme.Numbux" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-    <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:windowBackground">@android:color/black</item>
     </style>
 
     <style name="Theme.Numbux.Fullscreen" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-    <item name="android:windowIsTranslucent">false</item>
+        <item name="android:windowIsTranslucent">false</item>
         <item name="android:windowBackground">@android:color/black</item>
         <item name="android:windowIsFloating">false</item>
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:backgroundDimEnabled">true</item>
     </style>
-</resources>
 
+    <!-- add this: -->
+    <style name="Theme.Numbux.PinDialog" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- no translucency or float—cover the whole screen -->
+        <item name="android:windowIsTranslucent">false</item>
+        <item name="android:windowIsFloating">false</item>
+        <!-- full-screen and black background -->
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowBackground">@android:color/black</item>
+        <!-- disable the window preview so nothing underneath shows -->
+        <item name="android:windowDisablePreview">true</item>
+    </style>
+</resources>
