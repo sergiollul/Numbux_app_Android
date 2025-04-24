@@ -72,16 +72,6 @@
             android:excludeFromRecents="true"
             android:theme="@style/Theme.Numbux.PinDialog">
         </activity>
-
-        <activity
-            android:name=".settings.SettingsActivity"
-            android:label="Settings"
-            android:parentActivityName=".MainActivity">
-            <!-- optional: add “up” navigation back to MainActivity -->
-            <meta-data
-                android:name="android.support.PARENT_ACTIVITY"
-                android:value=".MainActivity" />
-        </activity>
     </application>
 
     <!-- Permissions -->

@@ -69,8 +69,7 @@ class AppBlockerService : AccessibilityService() {
         if (pkg in uninstallPackages
             && !BlockManager.isTemporarilyAllowed(pkg)
             && type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            val timeoutMs = prefs.getString("key_uninstall_block_timeout","3000")
-                ?.toLongOrNull() ?: 3000L
+            val timeoutMs = 3000L
             Log.d("Numbux","[DEBUG] uninstall-state → block $timeoutMs")
             blockAllTouchesFor(timeoutMs)
         }
@@ -97,8 +96,7 @@ class AppBlockerService : AccessibilityService() {
             !BlockManager.isTemporarilyAllowed(pkg) &&
             type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
         ) {
-            val timeoutMs = prefs.getString("key_uninstall_block_timeout","3000")
-                ?.toLongOrNull() ?: 3000L
+            val timeoutMs = 3000L
             Log.d("Numbux","[DEBUG] disable-acc-state → block $timeoutMs")
             blockAllTouchesFor(timeoutMs)
 

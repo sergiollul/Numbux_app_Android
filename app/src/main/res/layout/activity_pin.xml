@@ -8,14 +8,6 @@
     android:gravity="center"
     android:padding="32dp">
 
-    <androidx.appcompat.widget.SwitchCompat
-        android:id="@+id/switchBlocking"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="App‑blocker Enabled"
-        android:checked="true"
-        android:layout_marginBottom="24dp"/>
-
     <EditText
         android:id="@+id/editTextPin"
         android:inputType="numberPassword"

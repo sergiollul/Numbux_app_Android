@@ -35,14 +35,6 @@ import com.example.numbux.utils.getDefaultLauncherPackage
 import com.example.numbux.control.BlockManager
 
 import android.net.Uri
-
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Icon
-import com.example.numbux.settings.SettingsActivity
-
-
 import androidx.compose.material3.ExperimentalMaterial3Api
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -117,18 +109,6 @@ class MainActivity : ComponentActivity() {
                     topBar = {
                         TopAppBar(
                             title = { Text("Numbux") },
-                            actions = {
-                                IconButton(onClick = {
-                                    startActivity(
-                                        Intent(this@MainActivity, SettingsActivity::class.java)
-                                    )
-                                }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Settings,
-                                        contentDescription = "Settings"
-                                    )
-                                }
-                            }
                         )
                     }
                 ) { innerPadding ->                               // <— only one lambda here!
