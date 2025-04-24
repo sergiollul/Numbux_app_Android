@@ -1,37 +1,61 @@
 package com.example.numbux.ui
 
 import android.app.Activity
+import android.content.SharedPreferences
 import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
 import android.widget.Toast
-import com.example.numbux.R
-import com.example.numbux.control.BlockManager
-import android.util.Log
-import android.view.MotionEvent // ← Required for dispatchTouchEvent
+import android.view.MotionEvent
 import android.view.WindowManager
 import android.graphics.Rect
 import android.view.View
+import androidx.preference.PreferenceManager
+import com.example.numbux.R
+import com.example.numbux.control.BlockManager
 
 class PinActivity : Activity() {
 
-    private val correctPin = "1234" // Puedes vincular esto a Firebase después
+    companion object {
+        // Packages requiring the fixed system PIN
+        private val SYSTEM_PACKAGES = setOf(
+            "com.android.packageinstaller",
+            "com.google.android.packageinstaller",
+            "com.android.permissioncontroller",
+            "com.android.settings"
+        )
+        private const val SYSTEM_PIN = "5678"
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_pin)
 
+        // Obtain SharedPreferences
+        val prefs: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(this)
+        // Get the package name we need to unlock
+        val targetPkg: String? = intent.getStringExtra("app_package")
+
+        // Get the user-defined app-lock PIN (default 1234)
+        val appLockPin: String = prefs.getString("pin_app_lock", "1234") ?: "1234"
+        // Decide which PIN to validate
+        val correctPin: String = if (targetPkg != null && SYSTEM_PACKAGES.contains(targetPkg)) {
+            SYSTEM_PIN
+        } else {
+            appLockPin
+        }
+
+        // Setup UI elements
         val input = findViewById<EditText>(R.id.editTextPin)
         val btn = findViewById<Button>(R.id.buttonUnlock)
-        val appPackage = intent.getStringExtra("app_package")
 
         btn.setOnClickListener {
             if (input.text.toString() == correctPin) {
-                if (!appPackage.isNullOrEmpty()) {
-                    BlockManager.allowTemporarily(appPackage)
-                    Toast.makeText(this, "App desbloqueada temporalmente", Toast.LENGTH_SHORT).show()
+                targetPkg?.let { pkg ->
+                    // Mark as temporarily allowed
+                    BlockManager.allowTemporarily(pkg)
+                    Toast.makeText(this, "Desbloqueado: $pkg", Toast.LENGTH_SHORT).show()
                 }
-
                 setResult(Activity.RESULT_OK)
                 BlockManager.isShowingPin = false
                 finish()
@@ -40,6 +64,7 @@ class PinActivity : Activity() {
             }
         }
 
+        // Keep screen on and override lock
         window.addFlags(
             WindowManager.LayoutParams.FLAG_FULLSCREEN or
                     WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
@@ -50,15 +75,17 @@ class PinActivity : Activity() {
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
-        val pinLayout = findViewById<View>(R.id.pinLayoutRoot) // <- your main container
-        if (pinLayout != null) {
+        val pinLayout = findViewById<View>(R.id.pinLayoutRoot)
+        if (pinLayout != null && ev != null) {
             val rect = Rect()
             pinLayout.getGlobalVisibleRect(rect)
-            if (rect.contains(ev?.rawX?.toInt() ?: 0, ev?.rawY?.toInt() ?: 0)) {
+            val x = ev.rawX.toInt()
+            val y = ev.rawY.toInt()
+            if (rect.contains(x, y)) {
                 return super.dispatchTouchEvent(ev)
-            } else {
-                return true
             }
+            // ignore touches outside
+            return true
         }
         return super.dispatchTouchEvent(ev)
     }
@@ -71,13 +98,12 @@ class PinActivity : Activity() {
     override fun onDestroy() {
         super.onDestroy()
         BlockManager.isShowingPin = false
-
-        val appPackage = intent.getStringExtra("app_package")
-        if (!appPackage.isNullOrEmpty()) {
-            BlockManager.dismissUntilAppChanges(appPackage)
+        intent.getStringExtra("app_package")?.let { pkg ->
+            BlockManager.dismissUntilAppChanges(pkg)
         }
     }
 
     override fun onBackPressed() {
+        // disable back button
     }
 }
