@@ -149,16 +149,9 @@ fun MainScreen(
         }
         Text(
             if (blockingEnabled) "El bloqueador está ACTIVADO"
-            else                   "El bloqueador está DESACTIVADO",
+            else                  "El bloqueador está DESACTIVADO",
             style = MaterialTheme.typography.bodyMedium
         )
-
-        val ctx = LocalContext.current
-        Button(onClick = {
-            ctx.startActivity(Intent(ctx, PinActivity::class.java))
-        }) {
-            Text("Abrir pantalla de PIN")
-        }
     }
 }
 
