@@ -34,6 +34,11 @@ import com.example.numbux.ui.theme.NumbuxTheme
 import com.example.numbux.utils.getDefaultLauncherPackage
 import com.example.numbux.control.BlockManager
 
+import android.widget.EditText
+import android.text.InputType
+import android.widget.Toast
+
+
 import android.net.Uri
 import androidx.compose.material3.ExperimentalMaterial3Api
 
@@ -114,12 +119,43 @@ class MainActivity : ComponentActivity() {
                 ) { innerPadding ->                               // <— only one lambda here!
                     MainScreen(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding),                      // use the padding
+                                .fillMaxSize()
+                                .padding(innerPadding),
                         blockingEnabled = blockingEnabled,
                         onToggleBlocking = { enabled ->
-                            prefs.edit().putBoolean("blocking_enabled", enabled).apply()
-                            blockingEnabled = enabled
+                            if (!enabled) {
+                                // build a PIN‐entry EditText
+                                val pinInput = EditText(activity).apply {
+                                    inputType = InputType.TYPE_CLASS_NUMBER or
+                                            InputType.TYPE_NUMBER_VARIATION_PASSWORD
+                                    hint = "####"
+                                }
+
+                                AlertDialog.Builder(activity)
+                                .setTitle("Ingrese PIN para desactivar")
+                                .setView(pinInput)
+                                .setPositiveButton("OK") { dialog, _ ->
+                                    val entered = pinInput.text.toString()
+                                    val correct = prefs.getString("pin_app_lock", "1234")
+                                    if (entered == correct) {
+                                        // PIN OK → actually disable
+                                        prefs.edit().putBoolean("blocking_enabled", false).apply()
+                                        blockingEnabled = false
+                                        } else {
+                                        Toast.makeText(
+                                            activity,
+                                            "PIN incorrecto",
+                                            Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    }
+                                .setNegativeButton("Cancelar", null)
+                                .show()
+                            } else {
+                                // turning ON: No PIN needed
+                                prefs.edit().putBoolean("blocking_enabled", true).apply()
+                                blockingEnabled = true
+                            }
                         }
                     )
                 }
