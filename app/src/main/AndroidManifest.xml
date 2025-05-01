@@ -17,56 +17,15 @@
 
     <application
         android:allowBackup="true"
-        android:dataExtractionRules="@xml/data_extraction_rules"
-        android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
-        android:supportsRtl="true"
         android:theme="@style/Theme.Numbux"
         tools:targetApi="31">
 
-        <!-- Device Admin Receiver -->
-        <receiver
-            android:exported="true"
-            android:name=".admin.MyDeviceAdminReceiver"
-            android:description="@string/device_admin_description"
-            android:label="@string/device_admin_label"
-            android:permission="android.permission.BIND_DEVICE_ADMIN">
-            <meta-data
-                android:name="android.app.device_admin"
-                android:resource="@xml/device_admin_receiver"/>
-            <intent-filter>
-                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED"/>
-            </intent-filter>
-        </receiver>
-
-        <!-- Pin-on-demand Receiver -->
-        <receiver
-            android:name=".StartPinReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="com.example.numbux.SHOW_PIN"/>
-            </intent-filter>
-        </receiver>
-
-        <!-- Accessibility Service -->
-        <service
-            android:name=".accessibility.AppBlockerService"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:exported="false"
-            android:stopWithTask="false">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService"/>
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/accessibility_config"/>
-        </service>
-
-        <!-- 1) Real blocker app entrypoint -->
+        <!-- LOGIN (single icon!) -->
         <activity
-            android:name=".MainActivity"
+            android:name=".LoginActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.Numbux">
@@ -76,26 +35,21 @@
             </intent-filter>
         </activity>
 
-        <!-- 2) Alias → Controller mode (reuses ic_launcher) -->
-        <activity-alias
-            android:name=".ControllerLauncher"
-            android:targetActivity=".ControlActivity"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher"
-            android:label="@string/controller_label">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
-            </intent-filter>
-        </activity-alias>
+        <!-- real blocker UI -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.Numbux" />
 
-        <!-- The actual controller Activity -->
+        <!-- controller UI -->
         <activity
             android:name=".ControlActivity"
             android:exported="false"
-            android:label="@string/controller_label"/>
+            android:label="@string/controller_label"
+            android:theme="@style/Theme.Numbux" />
 
-        <!-- Pin-entry dialog Activity -->
+        <!-- Pin dialog & other receivers/services… -->
         <activity
             android:name=".ui.PinActivity"
             android:exported="true"
@@ -103,7 +57,38 @@
             android:showOnLockScreen="true"
             android:turnScreenOn="true"
             android:excludeFromRecents="true"
-            android:theme="@style/Theme.Numbux.PinDialog"/>
+            android:theme="@style/Theme.Numbux.PinDialog" />
+
+        <receiver android:name=".StartPinReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="com.example.numbux.SHOW_PIN"/>
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name=".accessibility.AppBlockerService"
+            android:exported="false"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:stopWithTask="false">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_config"/>
+        </service>
+
+        <receiver
+            android:name=".admin.MyDeviceAdminReceiver"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin_receiver"/>
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED"/>
+            </intent-filter>
+        </receiver>
 
     </application>
 </manifest>
