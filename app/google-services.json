@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "603857213690",
+    "project_id": "numbux-790d6",
+    "storage_bucket": "numbux-790d6.firebasestorage.app",
+     "firebase_url": "https://numbux-790d6-default-rtdb.europe-west1.firebasedatabase.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:603857213690:android:efb706fa415517f5485143",
+        "android_client_info": {
+          "package_name": "com.example.numbux"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCfPjzSLY6IAsSt22sW2OmuaByYLxdBlwc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

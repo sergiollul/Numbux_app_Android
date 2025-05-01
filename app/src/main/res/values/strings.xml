@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">Numbux</string>
+    <string name="controller_label">Numbux Controller</string>
     <string name="accessibility_service_description">Servicio de control parental Numbux</string>
 
     <!-- Device-admin meta -->

@@ -2,6 +2,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Permissions -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+
+    <queries>
+        <!-- Necesario si usas PackageManager para obtener apps instaladas -->
+        <intent>
+            <action android:name="android.intent.action.MAIN"/>
+            <category android:name="android.intent.category.LAUNCHER"/>
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -22,12 +35,13 @@
             android:permission="android.permission.BIND_DEVICE_ADMIN">
             <meta-data
                 android:name="android.app.device_admin"
-                android:resource="@xml/device_admin_receiver" />
+                android:resource="@xml/device_admin_receiver"/>
             <intent-filter>
-                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED"/>
             </intent-filter>
         </receiver>
 
+        <!-- Pin-on-demand Receiver -->
         <receiver
             android:name=".StartPinReceiver"
             android:exported="true">
@@ -43,26 +57,45 @@
             android:exported="false"
             android:stopWithTask="false">
             <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
+                <action android:name="android.accessibilityservice.AccessibilityService"/>
             </intent-filter>
             <meta-data
                 android:name="android.accessibilityservice"
-                android:resource="@xml/accessibility_config" />
+                android:resource="@xml/accessibility_config"/>
         </service>
 
-        <!-- Main Activity -->
+        <!-- 1) Real blocker app entrypoint -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.Numbux">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
 
-        <!-- Pin Activity -->
+        <!-- 2) Alias → Controller mode (reuses ic_launcher) -->
+        <activity-alias
+            android:name=".ControllerLauncher"
+            android:targetActivity=".ControlActivity"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/controller_label">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+
+        <!-- The actual controller Activity -->
+        <activity
+            android:name=".ControlActivity"
+            android:exported="false"
+            android:label="@string/controller_label"/>
+
+        <!-- Pin-entry dialog Activity -->
         <activity
             android:name=".ui.PinActivity"
             android:exported="true"
@@ -70,22 +103,7 @@
             android:showOnLockScreen="true"
             android:turnScreenOn="true"
             android:excludeFromRecents="true"
-            android:theme="@style/Theme.Numbux.PinDialog">
-        </activity>
+            android:theme="@style/Theme.Numbux.PinDialog"/>
+
     </application>
-
-    <!-- Permissions -->
-    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
-    <queries>
-        <!-- Necesario si usas PackageManager para obtener apps instaladas -->
-        <intent>
-            <action android:name="android.intent.action.MAIN" />
-            <category android:name="android.intent.category.LAUNCHER" />
-        </intent>
-    </queries>
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-
-
 </manifest>

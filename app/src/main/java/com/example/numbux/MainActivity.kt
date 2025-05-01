@@ -1,66 +1,62 @@
 package com.example.numbux
 
+import android.app.AlertDialog
 import android.content.ComponentName
-import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.text.TextUtils
 import android.util.Log
-import android.app.AlertDialog
-
+import android.widget.EditText
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
-
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import androidx.preference.PreferenceManager
-
 import com.example.numbux.accessibility.AppBlockerService
+import com.example.numbux.control.BlockManager
 import com.example.numbux.ui.PinActivity
 import com.example.numbux.ui.theme.NumbuxTheme
-import com.example.numbux.utils.getDefaultLauncherPackage
-import com.example.numbux.control.BlockManager
-
-import android.widget.EditText
-import android.text.InputType
-import android.widget.Toast
-
-
-import android.net.Uri
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.ValueEventListener
+import com.google.firebase.database.ktx.database
+import com.google.firebase.ktx.Firebase
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.core.view.WindowCompat
 
-@OptIn(ExperimentalMaterial3Api::class)
+
+
 class MainActivity : ComponentActivity() {
 
     private fun isAccessibilityServiceEnabled(): Boolean {
-        val expected = ComponentName(this, AppBlockerService::class.java).flattenToString()
+        val expected = ComponentName(this, AppBlockerService::class.java)
+            .flattenToString()
         val enabled = Settings.Secure.getString(
             contentResolver,
             Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
         ) ?: return false
 
-        val splitter = TextUtils.SimpleStringSplitter(':').apply {
-            setString(enabled)
-        }
-        return splitter.any { it.equals(expected, ignoreCase = true) }
+        return TextUtils.SimpleStringSplitter(':')
+            .apply { setString(enabled) }
+            .any { it.equals(expected, ignoreCase = true) }
     }
 
+    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
 
+
+        // 1) Overlay & Accessibility checks
         if (!Settings.canDrawOverlays(this)) {
             startActivity(
                 Intent(
@@ -68,22 +64,13 @@ class MainActivity : ComponentActivity() {
                     Uri.parse("package:$packageName")
                 )
             )
-            finish() // stop here until they grant it
+            finish()
             return
         }
 
-        enableEdgeToEdge()
-
-        val launcher = getDefaultLauncherPackage(this)
         BlockManager.setBlockedAppsExcept(
             this,
-            listOf(
-                packageName,
-                "com.android.settings",
-                "com.android.systemui",
-            ).let {
-                if (launcher != null) it + launcher else it
-            }
+            listOf(packageName, "com.android.settings", "com.android.systemui")
         )
 
         if (!isAccessibilityServiceEnabled()) {
@@ -100,104 +87,127 @@ class MainActivity : ComponentActivity() {
                 .show()
         }
 
+        // 2) Prefs & Firebase setup
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
-        // capture the Activity for use inside the Compose lambda
         val activity = this
 
-        setContent {
-            var blockingEnabled by rememberSaveable {
-                mutableStateOf(prefs.getBoolean("blocking_enabled", false))
+        Firebase.auth.signInAnonymously()
+
+        val room = "testRoom"
+        // 1) Point the SDK at your live DB
+        val firebaseUrl = "https://numbux-790d6-default-rtdb.europe-west1.firebasedatabase.app"
+        val database = Firebase.database(firebaseUrl)
+
+        // 2) Reference your shared node
+        val dbRef = database
+            .getReference("rooms")
+            .child(room)
+            .child("blocking_enabled")
+
+
+        // Host your Compose state here
+        val blockingState = mutableStateOf(
+            prefs.getBoolean("blocking_enabled", false)
+        )
+
+        // Listen for remote toggles
+        dbRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val remote = snapshot.getValue(Boolean::class.java) ?: false
+                prefs.edit().putBoolean("blocking_enabled", remote).apply()
+                blockingState.value = remote
             }
+            override fun onCancelled(error: DatabaseError) {
+                Log.w("MainActivity", "Firebase listen failed", error.toException())
+            }
+        })
+
+        // 3) Compose UI
+        setContent {
+            // pull in our state
+            val blockingEnabled by blockingState
 
             NumbuxTheme {
                 Scaffold(
                     topBar = {
-                        TopAppBar(
-                            title = { Text("Numbux") },
+                        TopAppBar(title = { Text("Numbux") })
+                    }
+                ) { innerPadding ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding)
+                            .padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            "Bienvenido a Numbux",
+                            style = MaterialTheme.typography.headlineSmall
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Bloqueo de apps")
+                            Spacer(Modifier.width(8.dp))
+                            Switch(
+                                checked = blockingEnabled,
+                                onCheckedChange = { enabled ->
+                                    if (!enabled) {
+                                        // PIN-entry dialog
+                                        val pinInput = EditText(activity).apply {
+                                            inputType =
+                                                android.text.InputType
+                                                    .TYPE_CLASS_NUMBER or
+                                                        android.text.InputType
+                                                            .TYPE_NUMBER_VARIATION_PASSWORD
+                                            hint = "####"
+                                        }
+                                        AlertDialog.Builder(activity)
+                                            .setTitle("Ingrese PIN para desactivar")
+                                            .setView(pinInput)
+                                            .setPositiveButton("OK") { _, _ ->
+                                                val entered = pinInput.text.toString()
+                                                val correct = prefs
+                                                    .getString("pin_app_lock", "1234")
+                                                if (entered == correct) {
+                                                    // locally & remotely turn OFF
+                                                    blockingState.value = false
+                                                    prefs.edit()
+                                                        .putBoolean("blocking_enabled", false)
+                                                        .apply()
+                                                    dbRef.setValue(false)
+                                                } else {
+                                                    Toast
+                                                        .makeText(
+                                                            activity,
+                                                            "PIN incorrecto",
+                                                            Toast.LENGTH_SHORT
+                                                        )
+                                                        .show()
+                                                }
+                                            }
+                                            .setNegativeButton("Cancelar", null)
+                                            .show()
+                                    } else {
+                                        // turn ON immediately
+                                        blockingState.value = true
+                                        prefs.edit()
+                                            .putBoolean("blocking_enabled", true)
+                                            .apply()
+                                        dbRef.setValue(true)
+                                    }
+                                }
+                            )
+                        }
+                        Text(
+                            if (blockingEnabled)
+                                "El bloqueador está ACTIVADO"
+                            else
+                                "El bloqueador está DESACTIVADO",
+                            style = MaterialTheme.typography.bodyMedium
                         )
                     }
-                ) { innerPadding ->                               // <— only one lambda here!
-                    MainScreen(
-                        modifier = Modifier
-                                .fillMaxSize()
-                                .padding(innerPadding),
-                        blockingEnabled = blockingEnabled,
-                        onToggleBlocking = { enabled ->
-                            if (!enabled) {
-                                // build a PIN‐entry EditText
-                                val pinInput = EditText(activity).apply {
-                                    inputType = InputType.TYPE_CLASS_NUMBER or
-                                            InputType.TYPE_NUMBER_VARIATION_PASSWORD
-                                    hint = "####"
-                                }
-
-                                AlertDialog.Builder(activity)
-                                .setTitle("Ingrese PIN para desactivar")
-                                .setView(pinInput)
-                                .setPositiveButton("OK") { dialog, _ ->
-                                    val entered = pinInput.text.toString()
-                                    val correct = prefs.getString("pin_app_lock", "1234")
-                                    if (entered == correct) {
-                                        // PIN OK → actually disable
-                                        prefs.edit().putBoolean("blocking_enabled", false).apply()
-                                        blockingEnabled = false
-                                        } else {
-                                        Toast.makeText(
-                                            activity,
-                                            "PIN incorrecto",
-                                            Toast.LENGTH_SHORT
-                                            ).show()
-                                        }
-                                    }
-                                .setNegativeButton("Cancelar", null)
-                                .show()
-                            } else {
-                                // turning ON: No PIN needed
-                                prefs.edit().putBoolean("blocking_enabled", true).apply()
-                                blockingEnabled = true
-                            }
-                        }
-                    )
                 }
             }
         }
-    }
-}
-
-@Composable
-fun MainScreen(
-    modifier: Modifier = Modifier,
-    blockingEnabled: Boolean,
-    onToggleBlocking: (Boolean) -> Unit
-) {
-    Column(
-        modifier = modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
-    ) {
-        Text("Bienvenido a Numbux", style = MaterialTheme.typography.headlineSmall)
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Bloqueo de apps")
-            Switch(
-                checked = blockingEnabled,
-                onCheckedChange = onToggleBlocking
-            )
-        }
-        Text(
-            if (blockingEnabled) "El bloqueador está ACTIVADO"
-            else                  "El bloqueador está DESACTIVADO",
-            style = MaterialTheme.typography.bodyMedium
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun MainScreenPreview() {
-    NumbuxTheme {
-        MainScreen(
-            blockingEnabled = true,
-            onToggleBlocking = { }
-        )
     }
 }
