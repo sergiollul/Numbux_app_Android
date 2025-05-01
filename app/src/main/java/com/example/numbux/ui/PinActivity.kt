@@ -58,6 +58,12 @@ class PinActivity : Activity() {
                 }
                 setResult(Activity.RESULT_OK)
                 BlockManager.isShowingPin = false
+
+                // only now do we “dismiss until the app changes”
+                intent.getStringExtra("app_package")?.let { pkg ->
+                    BlockManager.dismissUntilAppChanges(pkg)
+                }
+
                 finish()
             } else {
                 Toast.makeText(this, "PIN incorrecto", Toast.LENGTH_SHORT).show()
@@ -98,9 +104,6 @@ class PinActivity : Activity() {
     override fun onDestroy() {
         super.onDestroy()
         BlockManager.isShowingPin = false
-        intent.getStringExtra("app_package")?.let { pkg ->
-            BlockManager.dismissUntilAppChanges(pkg)
-        }
     }
 
     override fun onBackPressed() {

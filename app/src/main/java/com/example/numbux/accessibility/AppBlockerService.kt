@@ -26,14 +26,38 @@ class AppBlockerService : AccessibilityService() {
 
     // SharedPreferences + listener to reset state when blocking is turned back on
     private lateinit var prefs: SharedPreferences
+
     private val prefListener =
-        SharedPreferences.OnSharedPreferenceChangeListener { shared, key ->
-            if (key == "blocking_enabled" && shared.getBoolean(key, true)) {
-                Log.d("Numbux", "[DEBUG] blocking re-enabled → clearing state")
+    SharedPreferences.OnSharedPreferenceChangeListener { shared, key ->
+        if (key == "blocking_enabled") {
+            val enabled = shared.getBoolean(key, true)
+            Log.d("Numbux", "[DEBUG] blocking_enabled changed → $enabled")
+            if (enabled) {
+                // 1) Clear any prior “allow once” or dismissals
                 BlockManager.clearAllTemporarilyAllowed()
                 BlockManager.clearAllDismissed()
+
+                // 2) Immediately enforce lock on the current package
+                lastPackage?.let { pkg ->
+                    // skip your own APK-UI or system dialogs
+                    if (pkg != applicationContext.packageName
+                        && pkg !in uninstallPackages
+                        && !pkg.startsWith("com.android.systemui")
+                    && !pkg.startsWith("com.android.settings")
+                    ) {
+                        Handler(Looper.getMainLooper()).post {
+                            startActivity(
+                                Intent(this, PinActivity::class.java).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                    putExtra("app_package", pkg)
+                                }
+                            )
+                        }
+                    }
+                }
             }
         }
+    }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
