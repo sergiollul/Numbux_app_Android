@@ -1,6 +1,9 @@
 package com.example.numbux
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -10,9 +13,18 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.preference.PreferenceManager
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.example.numbux.ui.theme.NumbuxTheme
+import com.example.numbux.utils.AccessibilityUtils
+import com.example.numbux.notifications.NotificationUtils
 
 class LoginActivity : ComponentActivity() {
+
+    companion object {
+        private const val NOTIF_REQUEST_CODE = 1002
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -20,26 +32,28 @@ class LoginActivity : ComponentActivity() {
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
         when (prefs.getString("role", null)) {
             "controller" -> {
-                startActivity(Intent(this, ControlActivity::class.java))
-                finish()
+                navigateTo(ControlActivity::class.java)
                 return
             }
             "student" -> {
-                startActivity(Intent(this, MainActivity::class.java))
-                finish()
+                // Si ya tiene rol de estudiante y accesibilidad activa, cancelar notificación
+                if (AccessibilityUtils.isAccessibilityEnabled(this)) {
+                    NotificationUtils.cancelAccessibilityNotification(this)
+                }
+                navigateTo(MainActivity::class.java)
                 return
             }
         }
 
-        // 2) Mostrar pantalla de login
+        // 2) Mostrar la pantalla de login
         setContent {
             var credential by remember { mutableStateOf("") }
-            var error      by remember { mutableStateOf<String?>(null) }
+            var error by remember { mutableStateOf<String?>(null) }
 
             NumbuxTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     Column(
-                        modifier           = Modifier
+                        modifier = Modifier
                             .fillMaxSize()
                             .padding(24.dp),
                         verticalArrangement = Arrangement.Center
@@ -47,14 +61,14 @@ class LoginActivity : ComponentActivity() {
                         Text("Acceso Numbux", style = MaterialTheme.typography.headlineSmall)
                         Spacer(Modifier.height(16.dp))
                         OutlinedTextField(
-                            value        = credential,
-                            onValueChange= {
+                            value = credential,
+                            onValueChange = {
                                 credential = it
-                                error      = null
+                                error = null
                             },
-                            label        = { Text("Clave de acceso") },
-                            singleLine   = true,
-                            modifier     = Modifier.fillMaxWidth()
+                            label = { Text("Clave de acceso") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
                         )
                         error?.let { e ->
                             Spacer(Modifier.height(8.dp))
@@ -62,29 +76,7 @@ class LoginActivity : ComponentActivity() {
                         }
                         Spacer(Modifier.height(24.dp))
                         Button(
-                            onClick = {
-                                when (credential.trim()) {
-                                    "profesor1234" -> {
-                                        // guardamos y arrancamos controlador
-                                        prefs.edit()
-                                            .putString("role", "controller")
-                                            .apply()
-                                        startActivity(Intent(this@LoginActivity, ControlActivity::class.java))
-                                        finish()
-                                    }
-                                    "estudiante1234" -> {
-                                        // guardamos y arrancamos bloqueador
-                                        prefs.edit()
-                                            .putString("role", "student")
-                                            .apply()
-                                        startActivity(Intent(this@LoginActivity, MainActivity::class.java))
-                                        finish()
-                                    }
-                                    else -> {
-                                        error = "Clave incorrecta"
-                                    }
-                                }
-                            },
+                            onClick = { handleLogin(credential.trim(), prefs) },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text("Entrar")
@@ -93,5 +85,65 @@ class LoginActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun handleLogin(credential: String, prefs: android.content.SharedPreferences) {
+        when (credential) {
+            "profesor1234" -> {
+                prefs.edit().putString("role", "controller").apply()
+                navigateTo(ControlActivity::class.java)
+            }
+            "estudiante1234" -> {
+                prefs.edit().putString("role", "student").apply()
+                requestOrShowNotification()
+            }
+            else -> {
+                // Aquí podrías mostrar un error de UI; en este diseño se ignora
+            }
+        }
+    }
+
+    private fun requestOrShowNotification() {
+        // Para Android 13+ pedimos permiso POST_NOTIFICATIONS
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                NOTIF_REQUEST_CODE
+            )
+        } else {
+            // Si no hay accesibilidad activada, mostramos notificación fija
+            if (!AccessibilityUtils.isAccessibilityEnabled(this)) {
+                NotificationUtils.showPersistentAccessibilityNotification(this)
+            }
+            navigateTo(MainActivity::class.java)
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == NOTIF_REQUEST_CODE &&
+            grantResults.isNotEmpty() &&
+            grantResults[0] == PackageManager.PERMISSION_GRANTED
+        ) {
+            if (!AccessibilityUtils.isAccessibilityEnabled(this)) {
+                NotificationUtils.showPersistentAccessibilityNotification(this)
+            }
+        }
+        navigateTo(MainActivity::class.java)
+    }
+
+    private fun navigateTo(target: Class<*>) {
+        startActivity(Intent(this, target))
+        finish()
     }
 }
