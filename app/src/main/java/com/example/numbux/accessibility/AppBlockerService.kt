@@ -78,16 +78,21 @@ class AppBlockerService : AccessibilityService() {
         // 3) Check overlay permission
         if (!Settings.canDrawOverlays(this)) return
 
-        // 4) Compute nav-bar height so we leave the bottom buttons exposed
+        // 4) Get nav-bar height
         val res = resources
-        val navBarResId = res.getIdentifier("navigation_bar_height", "dimen", "android")
-        val navBarHeight = if (navBarResId > 0) res.getDimensionPixelSize(navBarResId) else 0
+        val navBarId = res.getIdentifier("navigation_bar_height", "dimen", "android")
+        val navBarH = if (navBarId > 0) res.getDimensionPixelSize(navBarId) else 0
 
-        // 5) Compute overlay height
-        val dm: DisplayMetrics = res.displayMetrics
-        val overlayHeight = dm.heightPixels - navBarHeight
+        // 5) Convert 100 dp into pixels for your extra bottom gap
+        val bottomGapDp = 100f
+        val displayMetrics = res.displayMetrics
+        val bottomGapPx = (bottomGapDp * displayMetrics.density).toInt()
 
-        // 6) Create & add the black view
+        // 6) Compute overlay height = full screen minus nav-bar minus extra gap
+        val screenH = displayMetrics.heightPixels
+        val overlayH = screenH - navBarH - bottomGapPx
+
+        // 7) Build & add the view just as before
         val wm = getSystemService(WINDOW_SERVICE) as WindowManager
         val overlay = View(this).apply {
             setBackgroundColor(Color.BLACK)
@@ -95,7 +100,7 @@ class AppBlockerService : AccessibilityService() {
         }
         val lp = LayoutParams(
             LayoutParams.MATCH_PARENT,
-            overlayHeight,
+            overlayH,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             LayoutParams.FLAG_NOT_FOCUSABLE
                     or LayoutParams.FLAG_LAYOUT_IN_SCREEN
@@ -104,7 +109,6 @@ class AppBlockerService : AccessibilityService() {
         ).apply {
             gravity = Gravity.TOP
         }
-
         wm.addView(overlay, lp)
         recentsOverlay = overlay
     }
