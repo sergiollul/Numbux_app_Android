@@ -37,6 +37,10 @@ import androidx.core.view.WindowCompat
 
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        private const val REQ_OVERLAY = 1001
+    }
+
     private fun isAccessibilityServiceEnabled(): Boolean {
         val expected = ComponentName(this, AppBlockerService::class.java)
             .flattenToString()
@@ -53,8 +57,20 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WindowCompat.setDecorFitsSystemWindows(window, false)
 
+        // 1) Check overlay permission right away, *before* anything else
+        if (!Settings.canDrawOverlays(this)) {
+            Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:$packageName")).also { intent ->
+                // start with a request code so we can catch the result
+                startActivityForResult(intent, REQ_OVERLAY)
+            }
+            // don’t finish() here—let onActivityResult fire when they're done
+            return
+        }
+
+        // 2) Now you know you have the overlay permission,
+        //    you can safely enable your blocker service, set up compose, etc.
 
         // 1) Overlay & Accessibility checks
         if (!Settings.canDrawOverlays(this)) {
@@ -210,4 +226,20 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQ_OVERLAY) {
+            if (Settings.canDrawOverlays(this)) {
+                // Great—permission granted. Restart onCreate logic:
+                recreate()
+            } else {
+                Toast.makeText(this,
+                    "Se necesita permiso para mostrar sobre otras apps",
+                    Toast.LENGTH_LONG).show()
+                finish()  // give up if they deny
+            }
+        }
+    }
+
 }

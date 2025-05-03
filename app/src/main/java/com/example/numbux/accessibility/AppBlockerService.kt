@@ -20,8 +20,18 @@ import com.example.numbux.control.BlockManager
 import com.example.numbux.ui.PinActivity
 import com.example.numbux.utils.getDefaultLauncherPackage
 import android.widget.Toast
+import android.graphics.Color
+
+import android.provider.Settings
+import android.net.Uri
+
+
+
+
 
 class AppBlockerService : AccessibilityService() {
+
+    private var recentsOverlay: View? = null
 
     private var inRecents = false
     private var touchBlocker: View? = null
@@ -54,6 +64,61 @@ class AppBlockerService : AccessibilityService() {
         }
     }
 
+    private val handler = Handler(Looper.getMainLooper())
+    private var removeRunnable: Runnable? = null
+
+    private fun showRecentsOverlay() {
+        // 1) Cancel any scheduled removal
+        removeRunnable?.let { handler.removeCallbacks(it) }
+
+        // 2) If it’s already up, nothing to do
+        if (recentsOverlay != null) return
+
+        // 3) Check overlay permission
+        if (!Settings.canDrawOverlays(this)) return
+
+        // 4) Create & add the black view
+        val wm = getSystemService(WINDOW_SERVICE) as WindowManager
+        val overlay = View(this).apply {
+            setBackgroundColor(Color.BLACK)
+            setOnTouchListener { _, _ -> true }
+        }
+        val lp = LayoutParams(
+            LayoutParams.MATCH_PARENT,
+            LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            LayoutParams.FLAG_NOT_FOCUSABLE
+                    or LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                    or LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.OPAQUE
+        )
+        wm.addView(overlay, lp)
+        recentsOverlay = overlay
+    }
+
+    private fun scheduleRecentsClose() {
+        // cancel any old removal
+        removeRunnable?.let { handler.removeCallbacks(it) }
+
+        // create a new one
+        val r = Runnable {
+            inRecents = false
+            removeRecentsOverlay()
+        }
+        removeRunnable = r
+
+        // only remove after 200 ms, giving Recents time to stabilize
+        handler.postDelayed(r, 200)
+    }
+
+
+    private fun removeRecentsOverlay() {
+        recentsOverlay?.let { view ->
+            (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(view)
+            recentsOverlay = null
+        }
+    }
+
     override fun onServiceConnected() {
         super.onServiceConnected()
 
@@ -75,22 +140,25 @@ class AppBlockerService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
-        val cls = event.className?.toString() ?: return
+        val cls = event.className?.toString()   ?: return
+
         val isRecents = cls.contains("RecentsActivity", ignoreCase = true)
+        val homePkg  = getDefaultLauncherPackage(this)
 
         if (!inRecents && isRecents) {
+            // Entered Recents
             inRecents = true
-            val pressTimeMs = event.eventTime + System.currentTimeMillis() - SystemClock.uptimeMillis()
-            Log.d(
-                "AppBlockerService",
-                "▶︎ Recents at $pressTimeMs (pkg=$pkg, cls=$cls)"
-            )
-            onRecentsOpened()
-        } else if (inRecents && !isRecents) {
-            inRecents = false
-            onRecentsClosed()
+            showRecentsOverlay()
+        }
+        else if (inRecents && !isRecents) {
+            // Really left Recents (back to Home/Launcher)
+            if (pkg == homePkg || (!pkg.startsWith("com.android.") && pkg != packageName)) {
+                inRecents = false
+                scheduleRecentsClose()
+            }
         }
     }
+
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN
@@ -108,16 +176,13 @@ class AppBlockerService : AccessibilityService() {
 
 
     private fun onRecentsOpened() {
-        // 1) Log to Logcat
         Log.d("AppBlockerService", "✅ onRecentsPressed fired!")
+        showRecentsOverlay()
     }
 
     private fun onRecentsClosed() {
         Log.d("AppBlockerService", "✅ Recents closed at ${System.currentTimeMillis()}")
-        // for visual confirmation you can also:
-        Handler(Looper.getMainLooper()).post {
-            Toast.makeText(this, "Recents CLOSED", Toast.LENGTH_SHORT).show()
-        }
+        scheduleRecentsClose()
     }
 
     override fun onInterrupt() {
