@@ -25,7 +25,8 @@ import android.graphics.Color
 import android.provider.Settings
 import android.net.Uri
 
-
+import android.view.Gravity
+import android.util.DisplayMetrics
 
 
 
@@ -77,7 +78,16 @@ class AppBlockerService : AccessibilityService() {
         // 3) Check overlay permission
         if (!Settings.canDrawOverlays(this)) return
 
-        // 4) Create & add the black view
+        // 4) Compute nav-bar height so we leave the bottom buttons exposed
+        val res = resources
+        val navBarResId = res.getIdentifier("navigation_bar_height", "dimen", "android")
+        val navBarHeight = if (navBarResId > 0) res.getDimensionPixelSize(navBarResId) else 0
+
+        // 5) Compute overlay height
+        val dm: DisplayMetrics = res.displayMetrics
+        val overlayHeight = dm.heightPixels - navBarHeight
+
+        // 6) Create & add the black view
         val wm = getSystemService(WINDOW_SERVICE) as WindowManager
         val overlay = View(this).apply {
             setBackgroundColor(Color.BLACK)
@@ -85,13 +95,16 @@ class AppBlockerService : AccessibilityService() {
         }
         val lp = LayoutParams(
             LayoutParams.MATCH_PARENT,
-            LayoutParams.MATCH_PARENT,
+            overlayHeight,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             LayoutParams.FLAG_NOT_FOCUSABLE
                     or LayoutParams.FLAG_LAYOUT_IN_SCREEN
                     or LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.OPAQUE
-        )
+        ).apply {
+            gravity = Gravity.TOP
+        }
+
         wm.addView(overlay, lp)
         recentsOverlay = overlay
     }
