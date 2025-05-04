@@ -49,7 +49,9 @@ class ControlActivity : ComponentActivity() {
                         val newVal = snapshot.getValue(Boolean::class.java) ?: false
                         remoteEnabled = newVal
                         // **Write into prefs so your service/UI everywhere picks it up**
-                        prefs.edit().putBoolean("blocking_enabled", newVal).apply()
+                        prefs.edit()
+                            .putBoolean("blocking_enabled", newVal)
+                            .commit()   // blocks until the value is written
                     }
                     override fun onCancelled(error: DatabaseError) { /* log if desired */ }
                 })
