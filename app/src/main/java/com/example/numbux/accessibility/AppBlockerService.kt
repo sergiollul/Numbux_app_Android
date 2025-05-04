@@ -41,35 +41,35 @@ class AppBlockerService : AccessibilityService() {
     private lateinit var prefs: SharedPreferences
 
     private val prefListener = SharedPreferences.OnSharedPreferenceChangeListener { shared, key ->
-        if (key != "blocking_enabled") return@OnSharedPreferenceChangeListener
-        val enabled = shared.getBoolean(key, true)
-        Log.d("AppBlockerService", "[DEBUG] blocking_enabled changed → $enabled")
-        if (!enabled) return@OnSharedPreferenceChangeListener
+        if (key == "blocking_enabled") {
+            val enabled = shared.getBoolean(key, true)
+            Log.d("AppBlockerService", "[DEBUG] blocking_enabled changed → $enabled")
 
-        // 1) Clear any prior “allow once” or dismissals
-        BlockManager.clearAllTemporarilyAllowed()
-        BlockManager.clearAllDismissed()
+            if (enabled) {
+                // 1) Clear any prior allows/dismissals
+                BlockManager.clearAllTemporarilyAllowed()
+                BlockManager.clearAllDismissed()
 
-        // 2) Figure out who’s actually in front right now
-        val current = rootInActiveWindow?.packageName?.toString()
-        if (current == null
-            || current == applicationContext.packageName            // skip our own app
-            || current in uninstallPackages                         // skip installer dialogs
-            || current.startsWith("com.android.systemui")
-            || current.startsWith("com.android.settings")
-        ) {
-            // either we’re in Numbux, or in a system/settings UI—no PIN here
-            return@OnSharedPreferenceChangeListener
-        }
+                // 2) **Rebuild your block list** so apps get blocked again
+                initializeBlockList()
 
-        // 3) Otherwise show PIN for that current package
-        Handler(Looper.getMainLooper()).post {
-            startActivity(
-                Intent(this, PinActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                    putExtra("app_package", current)
+                // 3) Optionally enforce lock on whatever’s in front right now:
+                val current = rootInActiveWindow?.packageName?.toString()
+                if (current != null
+                    && current != applicationContext.packageName
+                    && current !in uninstallPackages
+                    && !current.startsWith("com.android.systemui")
+                    && !current.startsWith("com.android.settings")
+                ) {
+                    Handler(Looper.getMainLooper()).post {
+                        startActivity(Intent(this, PinActivity::class.java)
+                            .apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                putExtra("app_package", current)
+                            })
+                    }
                 }
-            )
+            }
         }
     }
 
