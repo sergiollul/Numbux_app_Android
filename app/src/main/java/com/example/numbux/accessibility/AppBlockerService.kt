@@ -373,5 +373,4 @@ class AppBlockerService : AccessibilityService() {
         return pkg == "com.android.settings" &&
                 className?.contains("AlertDialog", ignoreCase = true) == true
     }
-    
 }
