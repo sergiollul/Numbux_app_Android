@@ -30,9 +30,6 @@ import android.util.DisplayMetrics
 import android.view.accessibility.AccessibilityEvent.*
 
 
-
-
-
 class AppBlockerService : AccessibilityService() {
 
     private var recentsOverlay: View? = null
@@ -180,10 +177,16 @@ class AppBlockerService : AccessibilityService() {
             type != TYPE_WINDOW_CONTENT_CHANGED &&
             type != TYPE_WINDOWS_CHANGED) return
 
+        // Common vars
         val pkg = event.packageName?.toString() ?: return
-        val cls = event.className?.toString()   ?: ""
+        val cls = event.className?.toString() ?: ""
         val homePkg = getDefaultLauncherPackage(this)
         val isRecents = cls.contains("RecentsActivity", ignoreCase = true)
+        // Get your app’s visible name at runtime:
+        val appName = applicationContext
+            .applicationInfo
+            .loadLabel(packageManager)
+            .toString()
 
         // ————— Recents overlay logic (only when toggle ON) —————
         if (prefs.getBoolean("blocking_enabled", true) && type == TYPE_WINDOW_STATE_CHANGED) {
@@ -212,7 +215,7 @@ class AppBlockerService : AccessibilityService() {
                     || type == TYPE_WINDOWS_CHANGED)
         ) {
             blockAllTouchesFor(3_000)
-            performGlobalAction(GLOBAL_ACTION_BACK)  // optionally keep
+            performGlobalAction(GLOBAL_ACTION_BACK)
             startActivity(Intent(this, PinActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 putExtra("app_package", pkg)
@@ -220,31 +223,32 @@ class AppBlockerService : AccessibilityService() {
             return
         }
 
-        // 2) Block uninstall dialog as soon as it opens
-        if (pkg in uninstallPackages
-            && !BlockManager.isTemporarilyAllowed(pkg)
-            && type == TYPE_WINDOW_STATE_CHANGED
-        ) {
-            blockAllTouchesFor(3_000)
-            return
-        }
+        // ————— Uninstall *only* Numbux —————
+        if (pkg in uninstallPackages && !BlockManager.isTemporarilyAllowed(pkg)) {
+            // Inspect the on-screen hierarchy for your app’s name
+            val root = rootInActiveWindow ?: return
+            val isDialogForNumbux = root.findAccessibilityNodeInfosByText(appName).isNotEmpty()
 
-        // 3) Dismiss uninstall + show PIN
-        if (pkg in uninstallPackages
-            && !BlockManager.isTemporarilyAllowed(pkg)
-            && (type == TYPE_WINDOW_CONTENT_CHANGED || type == TYPE_WINDOWS_CHANGED)
-        ) {
-            // don’t BACK here or you’ll bounce back to Numbux
-            startActivity(Intent(this, PinActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                putExtra("app_package", pkg)
-            })
-            return
+            if (isDialogForNumbux) {
+                // a) block touches when dialog first opens
+                if (type == TYPE_WINDOW_STATE_CHANGED) {
+                    blockAllTouchesFor(3_000)
+                    return
+                }
+                // b) show PIN once content arrives
+                if (type == TYPE_WINDOW_CONTENT_CHANGED || type == TYPE_WINDOWS_CHANGED) {
+                    startActivity(Intent(this, PinActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        putExtra("app_package", pkg)
+                    })
+                    return
+                }
+            }
         }
 
         // ————— Now we know it’s not one of the SYSTEM flows —————
 
-        // 4) Respect the master toggle: if blocking is OFF, do nothing further
+        // 4) Master toggle gates the rest
         if (!prefs.getBoolean("blocking_enabled", true)) return
 
         // 5) Skip system/UIs/your own
@@ -255,23 +259,23 @@ class AppBlockerService : AccessibilityService() {
             || pkg == applicationContext.packageName
         ) return
 
-        // 6) Ignore launcher itself
+        // 6) Ignore launcher
         if (pkg == homePkg) return
 
-        // 7) Reset per-app dismissals when switching apps
+        // 7) Reset per-app dismissals on app switch
         if (pkg != lastPackage) {
             if (BlockManager.isDismissed(pkg)) BlockManager.clearDismissed(pkg)
             BlockManager.resetAllDismissedIfPackageChanged(pkg)
         }
         lastPackage = pkg
 
-        // 8) Never block your own PIN Activity
+        // 8) Never block your own PIN UI
         if (cls.contains("PinActivity", ignoreCase = true)) return
 
-        // 9) Check temporary allows
+        // 9) Skip temporarily-allowed
         if (BlockManager.isTemporarilyAllowed(pkg)) return
 
-        // 10) Finally: show PIN for blocked apps
+        // 10) Finally: PIN-lock regular apps
         Handler(Looper.getMainLooper()).postDelayed({
             if (rootInActiveWindow?.packageName == pkg
                 && BlockManager.isAppBlocked(pkg)
