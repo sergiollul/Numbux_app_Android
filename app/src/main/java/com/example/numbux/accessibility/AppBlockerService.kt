@@ -30,6 +30,7 @@ import android.util.DisplayMetrics
 
 
 
+
 class AppBlockerService : AccessibilityService() {
 
     private var recentsOverlay: View? = null
@@ -155,27 +156,110 @@ class AppBlockerService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
-        if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        val type = event.eventType
+        // 1) Only listen for these three types
+        if (type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
+            type != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED &&
+            type != AccessibilityEvent.TYPE_WINDOWS_CHANGED) return
+
         val pkg = event.packageName?.toString() ?: return
-        val cls = event.className?.toString()   ?: return
-
+        val cls = event.className?.toString()   ?: ""
+        val homePkg = getDefaultLauncherPackage(this)
         val isRecents = cls.contains("RecentsActivity", ignoreCase = true)
-        val homePkg  = getDefaultLauncherPackage(this)
 
-        if (!inRecents && isRecents) {
-            // Entered Recents
-            inRecents = true
-            showRecentsOverlay()
-        }
-        else if (inRecents && !isRecents) {
-            // Really left Recents (back to Home/Launcher)
-            if (pkg == homePkg || (!pkg.startsWith("com.android.") && pkg != packageName)) {
+        // ————— Recents overlay logic, *only* on STATE_CHANGED —————
+        if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            if (!inRecents && isRecents) {
+                // Entered Recents
+                inRecents = true
+                showRecentsOverlay()
+                return
+            }
+            if (inRecents && !isRecents &&
+                // only consider real closes, not content-changes inside Recents
+                (pkg == homePkg || (!pkg.startsWith("com.android.") && pkg != packageName))
+            ) {
                 inRecents = false
                 scheduleRecentsClose()
+                return
             }
         }
-    }
 
+        // ————— Now we know it’s *not* a Recents open/close event —————
+
+        // 2) Skip all system/our own packages
+        if (pkg == "com.android.systemui"
+            || pkg.startsWith("com.android.settings")
+            || pkg.startsWith("com.samsung.android.spay")
+            || pkg.startsWith("com.samsung.android.honeyboard")  // <— skip Honeyboard too
+            || pkg == applicationContext.packageName                // <— skip our own
+        ) return
+
+        // Master toggle
+        if (!prefs.getBoolean("blocking_enabled", true)) return
+
+        // Ignore the launcher itself
+        if (pkg == homePkg) return
+
+        // Block uninstall dialog
+        if (pkg in uninstallPackages
+            && !BlockManager.isTemporarilyAllowed(pkg)
+            && type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+        ) {
+            blockAllTouchesFor(3_000)
+            return
+        }
+
+        // Dismiss uninstall + show PIN
+        if (pkg in uninstallPackages
+            && !BlockManager.isTemporarilyAllowed(pkg)
+            && (type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED || type == AccessibilityEvent.TYPE_WINDOWS_CHANGED)
+        ) {
+            performGlobalAction(GLOBAL_ACTION_BACK)
+            startActivity(Intent(this, PinActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                putExtra("app_package", pkg)
+            })
+            return
+        }
+
+        // PIN-protect turning Accessibility OFF
+        if (esIntentoDesactivarAccesibilidad(cls, pkg)
+            && !BlockManager.isTemporarilyAllowed(pkg)
+            && type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+        ) {
+            blockAllTouchesFor(3_000)
+            performGlobalAction(GLOBAL_ACTION_BACK)
+            startActivity(Intent(this, PinActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                putExtra("app_package", pkg)
+            })
+            return
+        }
+
+        // Reset per-app dismissals when switching apps
+        if (pkg != lastPackage) {
+            if (BlockManager.isDismissed(pkg)) BlockManager.clearDismissed(pkg)
+            BlockManager.resetAllDismissedIfPackageChanged(pkg)
+        }
+        lastPackage = pkg
+
+        // Never block your own PIN Activity
+        if (cls.contains("PinActivity", ignoreCase = true)) return
+
+        // Check temporary allows
+        if (BlockManager.isTemporarilyAllowed(pkg)) return
+
+        // Finally: show PIN for blocked apps
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (rootInActiveWindow?.packageName == pkg
+                && BlockManager.isAppBlocked(pkg)
+                && !BlockManager.isTemporarilyAllowed(pkg)
+            ) {
+                sendPinBroadcast(pkg)
+            }
+        }, 200)
+    }
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN
