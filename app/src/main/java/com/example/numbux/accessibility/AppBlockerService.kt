@@ -27,6 +27,8 @@ import android.net.Uri
 
 import android.view.Gravity
 import android.util.DisplayMetrics
+import android.view.accessibility.AccessibilityEvent.*
+
 
 
 
@@ -167,21 +169,17 @@ class AppBlockerService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         val type = event.eventType
-        // 1) Only listen for these three types
-        if (type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
-            type != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED &&
-            type != AccessibilityEvent.TYPE_WINDOWS_CHANGED) return
-
-        // 2) Respect the master toggle
-        if (!prefs.getBoolean("blocking_enabled", true)) return
+        if (type != TYPE_WINDOW_STATE_CHANGED &&
+            type != TYPE_WINDOW_CONTENT_CHANGED &&
+            type != TYPE_WINDOWS_CHANGED) return
 
         val pkg = event.packageName?.toString() ?: return
         val cls = event.className?.toString()   ?: ""
         val homePkg = getDefaultLauncherPackage(this)
         val isRecents = cls.contains("RecentsActivity", ignoreCase = true)
 
-        // ————— Recents overlay logic —————
-        if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+        // ————— Recents overlay logic (only when toggle ON) —————
+        if (prefs.getBoolean("blocking_enabled", true) && type == TYPE_WINDOW_STATE_CHANGED) {
             if (!inRecents && isRecents) {
                 inRecents = true
                 showRecentsOverlay()
@@ -196,17 +194,18 @@ class AppBlockerService : AccessibilityService() {
             }
         }
 
-        // ————— PIN-protect turning Accessibility OFF —————
-        // Match the AlertDialog that appears when the user taps “Turn off Numbux?”
+        // ————— Always-on SYSTEM flows —————
+
+        // 1) PIN-protect turning Accessibility OFF
         if (pkg == "com.android.settings"
             && cls.contains("AlertDialog", ignoreCase = true)
             && !BlockManager.isTemporarilyAllowed(pkg)
-            && (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
-                    || type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
-                    || type == AccessibilityEvent.TYPE_WINDOWS_CHANGED)
+            && (type == TYPE_WINDOW_STATE_CHANGED
+                    || type == TYPE_WINDOW_CONTENT_CHANGED
+                    || type == TYPE_WINDOWS_CHANGED)
         ) {
-            Log.d("AppBlockerService","🔒 Blocking disable-accessibility dialog (cls=$cls)")
             blockAllTouchesFor(3_000)
+            performGlobalAction(GLOBAL_ACTION_BACK)  // optionally keep
             startActivity(Intent(this, PinActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 putExtra("app_package", pkg)
@@ -214,40 +213,43 @@ class AppBlockerService : AccessibilityService() {
             return
         }
 
-        // ————— Now skip system or own packages (except settings, since we just handled it) —————
+        // 2) Block uninstall dialog as soon as it opens
+        if (pkg in uninstallPackages
+            && !BlockManager.isTemporarilyAllowed(pkg)
+            && type == TYPE_WINDOW_STATE_CHANGED
+        ) {
+            blockAllTouchesFor(3_000)
+            return
+        }
+
+        // 3) Dismiss uninstall + show PIN
+        if (pkg in uninstallPackages
+            && !BlockManager.isTemporarilyAllowed(pkg)
+            && (type == TYPE_WINDOW_CONTENT_CHANGED || type == TYPE_WINDOWS_CHANGED)
+        ) {
+            // don’t BACK here or you’ll bounce back to Numbux
+            startActivity(Intent(this, PinActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                putExtra("app_package", pkg)
+            })
+            return
+        }
+
+        // ————— Now we know it’s not one of the SYSTEM flows —————
+
+        // 4) Respect the master toggle: if blocking is OFF, do nothing further
+        if (!prefs.getBoolean("blocking_enabled", true)) return
+
+        // 5) Skip system/UIs/your own
         if (pkg == "com.android.systemui"
+            || pkg.startsWith("com.android.settings")
             || pkg.startsWith("com.samsung.android.spay")
             || pkg.startsWith("com.samsung.android.honeyboard")
             || pkg == applicationContext.packageName
         ) return
 
-        // 3) Now skip settings *other than* our disable dialog
-        if (pkg.startsWith("com.android.settings")) return
-
-        // 4) Ignore launcher itself
+        // 6) Ignore launcher itself
         if (pkg == homePkg) return
-
-        // 5) Block uninstall dialog
-        if (pkg in uninstallPackages
-            && !BlockManager.isTemporarilyAllowed(pkg)
-            && type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
-        ) {
-            blockAllTouchesFor(3_000)
-            return
-        }
-
-        // 6) Dismiss uninstall + show PIN
-        if (pkg in uninstallPackages
-            && !BlockManager.isTemporarilyAllowed(pkg)
-            && (type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
-                    || type == AccessibilityEvent.TYPE_WINDOWS_CHANGED)
-        ) {
-            startActivity(Intent(this, PinActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                putExtra("app_package", pkg)
-            })
-            return
-        }
 
         // 7) Reset per-app dismissals when switching apps
         if (pkg != lastPackage) {
