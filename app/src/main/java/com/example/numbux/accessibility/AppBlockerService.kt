@@ -207,7 +207,6 @@ class AppBlockerService : AccessibilityService() {
         ) {
             Log.d("AppBlockerService","🔒 Blocking disable-accessibility dialog (cls=$cls)")
             blockAllTouchesFor(3_000)
-            performGlobalAction(GLOBAL_ACTION_BACK)
             startActivity(Intent(this, PinActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 putExtra("app_package", pkg)
@@ -243,7 +242,6 @@ class AppBlockerService : AccessibilityService() {
             && (type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
                     || type == AccessibilityEvent.TYPE_WINDOWS_CHANGED)
         ) {
-            performGlobalAction(GLOBAL_ACTION_BACK)
             startActivity(Intent(this, PinActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 putExtra("app_package", pkg)
