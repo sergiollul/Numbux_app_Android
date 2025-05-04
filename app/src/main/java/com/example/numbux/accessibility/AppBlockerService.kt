@@ -70,6 +70,9 @@ class AppBlockerService : AccessibilityService() {
     private var removeRunnable: Runnable? = null
 
     private fun showRecentsOverlay() {
+        // only when the toggle is on
+        if (!prefs.getBoolean("blocking_enabled", true)) return
+
         // 1) Cancel any scheduled removal
         removeRunnable?.let { handler.removeCallbacks(it) }
 
@@ -162,6 +165,9 @@ class AppBlockerService : AccessibilityService() {
             type != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED &&
             type != AccessibilityEvent.TYPE_WINDOWS_CHANGED) return
 
+        // 2) Respect the master toggle: if blocking is off, do nothing
+        if (!prefs.getBoolean("blocking_enabled", true)) return
+
         val pkg = event.packageName?.toString() ?: return
         val cls = event.className?.toString()   ?: ""
         val homePkg = getDefaultLauncherPackage(this)
@@ -169,15 +175,15 @@ class AppBlockerService : AccessibilityService() {
 
         // ————— Recents overlay logic, *only* on STATE_CHANGED —————
         if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            // Entered Recents
             if (!inRecents && isRecents) {
-                // Entered Recents
                 inRecents = true
                 showRecentsOverlay()
                 return
             }
+            // Left Recents (to Home/Launcher or an app)
             if (inRecents && !isRecents &&
-                // only consider real closes, not content-changes inside Recents
-                (pkg == homePkg || (!pkg.startsWith("com.android.") && pkg != packageName))
+                (pkg == homePkg || (!pkg.startsWith("com.android.") && pkg != applicationContext.packageName))
             ) {
                 inRecents = false
                 scheduleRecentsClose()
@@ -187,21 +193,18 @@ class AppBlockerService : AccessibilityService() {
 
         // ————— Now we know it’s *not* a Recents open/close event —————
 
-        // 2) Skip all system/our own packages
+        // 3) Skip all system or own packages
         if (pkg == "com.android.systemui"
             || pkg.startsWith("com.android.settings")
             || pkg.startsWith("com.samsung.android.spay")
-            || pkg.startsWith("com.samsung.android.honeyboard")  // <— skip Honeyboard too
-            || pkg == applicationContext.packageName                // <— skip our own
+            || pkg.startsWith("com.samsung.android.honeyboard")
+            || pkg == applicationContext.packageName
         ) return
 
-        // Master toggle
-        if (!prefs.getBoolean("blocking_enabled", true)) return
-
-        // Ignore the launcher itself
+        // 4) Ignore launcher itself
         if (pkg == homePkg) return
 
-        // Block uninstall dialog
+        // 5) Block uninstall dialog
         if (pkg in uninstallPackages
             && !BlockManager.isTemporarilyAllowed(pkg)
             && type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
@@ -210,10 +213,11 @@ class AppBlockerService : AccessibilityService() {
             return
         }
 
-        // Dismiss uninstall + show PIN
+        // 6) Dismiss uninstall + show PIN
         if (pkg in uninstallPackages
             && !BlockManager.isTemporarilyAllowed(pkg)
-            && (type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED || type == AccessibilityEvent.TYPE_WINDOWS_CHANGED)
+            && (type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
+                    || type == AccessibilityEvent.TYPE_WINDOWS_CHANGED)
         ) {
             performGlobalAction(GLOBAL_ACTION_BACK)
             startActivity(Intent(this, PinActivity::class.java).apply {
@@ -223,7 +227,7 @@ class AppBlockerService : AccessibilityService() {
             return
         }
 
-        // PIN-protect turning Accessibility OFF
+        // 7) PIN-protect turning Accessibility OFF
         if (esIntentoDesactivarAccesibilidad(cls, pkg)
             && !BlockManager.isTemporarilyAllowed(pkg)
             && type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
@@ -237,20 +241,20 @@ class AppBlockerService : AccessibilityService() {
             return
         }
 
-        // Reset per-app dismissals when switching apps
+        // 8) Reset per-app dismissals when switching apps
         if (pkg != lastPackage) {
             if (BlockManager.isDismissed(pkg)) BlockManager.clearDismissed(pkg)
             BlockManager.resetAllDismissedIfPackageChanged(pkg)
         }
         lastPackage = pkg
 
-        // Never block your own PIN Activity
+        // 9) Never block your own PIN Activity
         if (cls.contains("PinActivity", ignoreCase = true)) return
 
-        // Check temporary allows
+        // 10) Check temporary allows
         if (BlockManager.isTemporarilyAllowed(pkg)) return
 
-        // Finally: show PIN for blocked apps
+        // 11) Finally: show PIN for blocked apps
         Handler(Looper.getMainLooper()).postDelayed({
             if (rootInActiveWindow?.packageName == pkg
                 && BlockManager.isAppBlocked(pkg)
