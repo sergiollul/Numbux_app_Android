@@ -33,192 +33,110 @@ import com.google.firebase.ktx.Firebase
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.core.view.WindowCompat
 
+import android.content.SharedPreferences
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
 
 
+
+@OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
 
     companion object {
         private const val REQ_OVERLAY = 1001
     }
 
-    private fun isAccessibilityServiceEnabled(): Boolean {
-        val expected = ComponentName(this, AppBlockerService::class.java)
-            .flattenToString()
-        val enabled = Settings.Secure.getString(
-            contentResolver,
-            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-        ) ?: return false
+    private lateinit var prefs: SharedPreferences
+    private lateinit var blockingState: MutableState<Boolean>
+    private lateinit var prefListener: SharedPreferences.OnSharedPreferenceChangeListener
 
-        return TextUtils.SimpleStringSplitter(':')
-            .apply { setString(enabled) }
-            .any { it.equals(expected, ignoreCase = true) }
-    }
-
-    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 1) Check overlay permission right away, *before* anything else
+        // 1) Overlay‐permission check (unchanged)…
         if (!Settings.canDrawOverlays(this)) {
-            Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:$packageName")).also { intent ->
-                // start with a request code so we can catch the result
-                startActivityForResult(intent, REQ_OVERLAY)
-            }
-            // don’t finish() here—let onActivityResult fire when they're done
-            return
-        }
-
-        // 2) Now you know you have the overlay permission,
-        //    you can safely enable your blocker service, set up compose, etc.
-
-        // 1) Overlay & Accessibility checks
-        if (!Settings.canDrawOverlays(this)) {
-            startActivity(
-                Intent(
-                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:$packageName")
-                )
+            startActivityForResult(
+                Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")),
+                REQ_OVERLAY
             )
-            finish()
             return
         }
 
-        BlockManager.setBlockedAppsExcept(
-            this,
-            listOf(packageName, "com.android.settings", "com.android.systemui")
-        )
+        // 2) Initialize SharedPreferences & Compose state
+        prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        blockingState = mutableStateOf(prefs.getBoolean("blocking_enabled", false))
 
-        if (!isAccessibilityServiceEnabled()) {
-            AlertDialog.Builder(this)
-                .setTitle("Activar Accesibilidad")
-                .setMessage(
-                    "Para que Numbux funcione correctamente, " +
-                            "ve a 'Apps instaladas'. Después 'Numbux' y actívalo."
-                )
-                .setPositiveButton("Entendido") { _, _ ->
-                    startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                }
-                .setCancelable(false)
-                .show()
+        // 3) Listen for external prefs changes
+        prefListener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+            if (key == "blocking_enabled") {
+                // update our Compose state
+                blockingState.value = sp.getBoolean(key, false)
+            }
         }
+        prefs.registerOnSharedPreferenceChangeListener(prefListener)
 
-        // 2) Prefs & Firebase setup
-        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
-        val activity = this
-
-        Firebase.auth.signInAnonymously()
-
+        // 4) Firebase remote listener (unchanged)
         val room = "testRoom"
-        // 1) Point the SDK at your live DB
         val firebaseUrl = "https://numbux-790d6-default-rtdb.europe-west1.firebasedatabase.app"
-        val database = Firebase.database(firebaseUrl)
-
-        // 2) Reference your shared node
-        val dbRef = database
+        val dbRef = Firebase.database(firebaseUrl)
             .getReference("rooms")
             .child(room)
             .child("blocking_enabled")
 
-
-        // Host your Compose state here
-        val blockingState = mutableStateOf(
-            prefs.getBoolean("blocking_enabled", false)
-        )
-
-        // Listen for remote toggles
         dbRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val remote = snapshot.getValue(Boolean::class.java) ?: false
+                // write to prefs *and* state – triggers our prefListener
                 prefs.edit().putBoolean("blocking_enabled", remote).apply()
-                blockingState.value = remote
             }
             override fun onCancelled(error: DatabaseError) {
                 Log.w("MainActivity", "Firebase listen failed", error.toException())
             }
         })
 
-        // 3) Compose UI
+        // 5) Now set up your Compose UI
         setContent {
-            // pull in our state
-            val blockingEnabled by blockingState
-
+            val enabled by blockingState
             NumbuxTheme {
-                Scaffold(
-                    topBar = {
-                        TopAppBar(title = { Text("Numbux") })
-                    }
-                ) { innerPadding ->
+                Scaffold(topBar = { TopAppBar(title = { Text("Numbux") }) }) { inner ->
                     Column(
-                        modifier = Modifier
+                        Modifier
                             .fillMaxSize()
-                            .padding(innerPadding)
+                            .padding(inner)
                             .padding(24.dp),
                         verticalArrangement = Arrangement.spacedBy(20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(
-                            "Bienvenido a Numbux",
-                            style = MaterialTheme.typography.headlineSmall
-                        )
+                        Text("Bienvenido a Numbux",
+                            style = MaterialTheme.typography.headlineSmall)
+
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Bloqueo de apps")
                             Spacer(Modifier.width(8.dp))
                             Switch(
-                                checked = blockingEnabled,
-                                onCheckedChange = { enabled ->
-                                    if (!enabled) {
-                                        // PIN-entry dialog
-                                        val pinInput = EditText(activity).apply {
-                                            inputType =
-                                                android.text.InputType
-                                                    .TYPE_CLASS_NUMBER or
-                                                        android.text.InputType
-                                                            .TYPE_NUMBER_VARIATION_PASSWORD
-                                            hint = "####"
-                                        }
-                                        AlertDialog.Builder(activity)
-                                            .setTitle("Ingrese PIN para desactivar")
-                                            .setView(pinInput)
-                                            .setPositiveButton("OK") { _, _ ->
-                                                val entered = pinInput.text.toString()
-                                                val correct = prefs
-                                                    .getString("pin_app_lock", "1234")
-                                                if (entered == correct) {
-                                                    // locally & remotely turn OFF
-                                                    blockingState.value = false
-                                                    prefs.edit()
-                                                        .putBoolean("blocking_enabled", false)
-                                                        .apply()
-                                                    dbRef.setValue(false)
-                                                } else {
-                                                    Toast
-                                                        .makeText(
-                                                            activity,
-                                                            "PIN incorrecto",
-                                                            Toast.LENGTH_SHORT
-                                                        )
-                                                        .show()
-                                                }
+                                checked = enabled,
+                                onCheckedChange = { isOn ->
+                                    if (!isOn) {
+                                        // ask PIN before disabling
+                                        showDisablePinDialog { success ->
+                                            if (success) {
+                                                // both local & remote
+                                                prefs.edit().putBoolean("blocking_enabled", false).apply()
+                                                dbRef.setValue(false)
                                             }
-                                            .setNegativeButton("Cancelar", null)
-                                            .show()
+                                        }
                                     } else {
-                                        // turn ON immediately
-                                        blockingState.value = true
-                                        prefs.edit()
-                                            .putBoolean("blocking_enabled", true)
-                                            .apply()
+                                        // enable immediately
+                                        prefs.edit().putBoolean("blocking_enabled", true).apply()
                                         dbRef.setValue(true)
                                     }
                                 }
                             )
                         }
+
                         Text(
-                            if (blockingEnabled)
-                                "El bloqueador está ACTIVADO"
-                            else
-                                "El bloqueador está DESACTIVADO",
+                            if (enabled) "El bloqueador está ACTIVADO"
+                            else "El bloqueador está DESACTIVADO",
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -227,19 +145,42 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun showDisablePinDialog(onResult: (Boolean) -> Unit) {
+        val pinInput = EditText(this).apply {
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or
+                    android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
+            hint = "####"
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Ingrese PIN para desactivar")
+            .setView(pinInput)
+            .setPositiveButton("OK") { _, _ ->
+                val entered = pinInput.text.toString()
+                val correct = prefs.getString("pin_app_lock", "1234")
+                if (entered == correct) onResult(true)
+                else {
+                    Toast.makeText(this, "PIN incorrecto", Toast.LENGTH_SHORT).show()
+                    onResult(false)
+                }
+            }
+            .setNegativeButton("Cancelar") { _, _ -> onResult(false) }
+            .show()
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQ_OVERLAY) {
-            if (Settings.canDrawOverlays(this)) {
-                // Great—permission granted. Restart onCreate logic:
-                recreate()
-            } else {
+            if (Settings.canDrawOverlays(this)) recreate()
+            else {
                 Toast.makeText(this,
-                    "Se necesita permiso para mostrar sobre otras apps",
-                    Toast.LENGTH_LONG).show()
-                finish()  // give up if they deny
+                    "Se necesita permiso para mostrar sobre otras apps", Toast.LENGTH_LONG).show()
+                finish()
             }
         }
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        prefs.unregisterOnSharedPreferenceChangeListener(prefListener)
+    }
 }
