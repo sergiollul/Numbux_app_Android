@@ -86,7 +86,7 @@ class PinActivity : Activity() {
             finish()
         }
     }
-    
+
     override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
         val pinLayout = findViewById<View>(R.id.pinLayoutRoot)
         if (pinLayout != null && ev != null) {
@@ -117,3 +117,4 @@ class PinActivity : Activity() {
         // disable back button
     }
 }
+
