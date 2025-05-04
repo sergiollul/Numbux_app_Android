@@ -43,34 +43,41 @@ class AppBlockerService : AccessibilityService() {
     private lateinit var prefs: SharedPreferences
 
     private val prefListener = SharedPreferences.OnSharedPreferenceChangeListener { shared, key ->
-        if (key == "blocking_enabled") {
-            val enabled = shared.getBoolean(key, true)
-            Log.d("AppBlockerService", "[DEBUG] blocking_enabled changed → $enabled")
+        if (key != "blocking_enabled") return@OnSharedPreferenceChangeListener
+        val enabled = shared.getBoolean(key, true)
+        Log.d("AppBlockerService", "[DEBUG] blocking_enabled changed → $enabled")
 
-            if (enabled) {
-                // 1) Clear any prior allows/dismissals
-                BlockManager.clearAllTemporarilyAllowed()
-                BlockManager.clearAllDismissed()
+        if (enabled) {
+            // 1) Clear any prior allows/dismissals
+            BlockManager.clearAllTemporarilyAllowed()
+            BlockManager.clearAllDismissed()
 
-                // 2) **Rebuild your block list** so apps get blocked again
-                initializeBlockList()
+            // 2) Rebuild block list
+            initializeBlockList()
 
-                // 3) Optionally enforce lock on whatever’s in front right now:
-                val current = rootInActiveWindow?.packageName?.toString()
-                if (current != null
-                    && current != applicationContext.packageName
-                    && current !in uninstallPackages
-                    && !current.startsWith("com.android.systemui")
-                    && !current.startsWith("com.android.settings")
-                ) {
-                    Handler(Looper.getMainLooper()).post {
-                        startActivity(Intent(this, PinActivity::class.java)
-                            .apply {
-                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                putExtra("app_package", current)
-                            })
+            // 3) Figure out who’s actually in front right now
+            val current = rootInActiveWindow?.packageName?.toString()
+            val homePkg = getDefaultLauncherPackage(this)
+
+            // 4) Don’t PIN on remote‐toggle if we’re already on home, Recents, Settings, SystemUI or our own app
+            if (current == null
+                || current == applicationContext.packageName
+                || current == homePkg                              // <— skip home/launcher
+                || current in uninstallPackages                    // skip installer
+                || current.startsWith("com.android.systemui")
+                || current.startsWith("com.android.settings")
+            ) {
+                return@OnSharedPreferenceChangeListener
+            }
+
+            // 5) Otherwise, show PIN for that package
+            Handler(Looper.getMainLooper()).post {
+                startActivity(
+                    Intent(this, PinActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        putExtra("app_package", current)
                     }
-                }
+                )
             }
         }
     }
