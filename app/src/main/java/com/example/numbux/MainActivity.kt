@@ -37,6 +37,13 @@ import android.content.SharedPreferences
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 
+import android.content.Context
+
+import android.view.accessibility.AccessibilityManager
+import android.accessibilityservice.AccessibilityServiceInfo
+
+
+
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,6 +56,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var prefs: SharedPreferences
     private lateinit var blockingState: MutableState<Boolean>
     private lateinit var prefListener: SharedPreferences.OnSharedPreferenceChangeListener
+    private var accessibilityDialog: AlertDialog? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,11 +70,16 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        // 2) Initialize SharedPreferences & Compose state
+        // 2) Accessibility-service check
+        if (!isAccessibilityServiceEnabled(this)) {
+            showEnableAccessibilityDialog()
+        }
+
+        // 3) Initialize SharedPreferences & Compose state
         prefs = PreferenceManager.getDefaultSharedPreferences(this)
         blockingState = mutableStateOf(prefs.getBoolean("blocking_enabled", false))
 
-        // 3) Listen for external prefs changes
+        // 4) Listen for external prefs changes
         prefListener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
             if (key == "blocking_enabled") {
                 // update our Compose state
@@ -75,7 +88,7 @@ class MainActivity : ComponentActivity() {
         }
         prefs.registerOnSharedPreferenceChangeListener(prefListener)
 
-        // 4) Firebase remote listener (unchanged)
+        // 5) Firebase remote listener (unchanged)
         val room = "testRoom"
         val firebaseUrl = "https://numbux-790d6-default-rtdb.europe-west1.firebasedatabase.app"
         val dbRef = Firebase.database(firebaseUrl)
@@ -94,7 +107,7 @@ class MainActivity : ComponentActivity() {
             }
         })
 
-        // 5) Now set up your Compose UI
+        // 6) Now set up your Compose UI
         setContent {
             val enabled by blockingState
             NumbuxTheme {
@@ -143,6 +156,59 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!isAccessibilityServiceEnabled(this)) {
+            if (accessibilityDialog?.isShowing != true) {
+                accessibilityDialog = AlertDialog.Builder(this)
+                    .setTitle("Numbux sin Permisos")
+                    .setMessage(
+                        "Para que Numbux funcione correctamente, ve a:\n" +
+                                "\n1. Accesibilidad → Apps Instaladas\n" +
+                                "\n2. Numbux → ON → Aceptar"
+                    )
+                    .setCancelable(false)
+                    .setPositiveButton("Abrir Ajustes") { _, _ ->
+                        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                    }
+                    .show()
+            }
+        } else {
+            accessibilityDialog?.dismiss()
+            accessibilityDialog = null
+        }
+    }
+
+    private fun isAccessibilityServiceEnabled(context: Context): Boolean {
+        val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+        val component = ComponentName(context, AppBlockerService::class.java)
+        val enabledServices = am
+            .getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_GENERIC)
+        return enabledServices.any {
+            val info = it.resolveInfo.serviceInfo
+            info.packageName == component.packageName &&
+                    info.name == component.className
+        }
+    }
+
+
+    private fun showEnableAccessibilityDialog() {
+        AlertDialog.Builder(this)
+        .setTitle("NumbuX sin Permisos")
+        .setMessage(
+            "Para que NumbuX funcione correctamente, ve a:\n" +
+                    "\n" +
+                    "1. Accesibilidad → Apps Instaladas\n" +
+                    "\n" +
+                    "2. Numbux → ON → Aceptar"
+        )
+        .setCancelable(false)
+        .setPositiveButton("Abrir Ajustes") { _, _ ->
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }
+        .show()
     }
 
     private fun showDisablePinDialog(onResult: (Boolean) -> Unit) {
