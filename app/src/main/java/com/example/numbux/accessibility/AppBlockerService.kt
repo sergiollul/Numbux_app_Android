@@ -39,45 +39,52 @@ class AppBlockerService : AccessibilityService() {
     private var lastPackage: String? = null
     private lateinit var prefs: SharedPreferences
 
-    private val prefListener = SharedPreferences.OnSharedPreferenceChangeListener { shared, key ->
-        if (key != "blocking_enabled") return@OnSharedPreferenceChangeListener
-        val enabled = shared.getBoolean(key, true)
-        Log.d("AppBlockerService", "[DEBUG] blocking_enabled changed → $enabled")
+    private val prefListener =
+        SharedPreferences.OnSharedPreferenceChangeListener { shared, key ->
+            if (key != "blocking_enabled") return@OnSharedPreferenceChangeListener
+            val enabled = shared.getBoolean(key, true)
+            Log.d("AppBlockerService", "[DEBUG] blocking_enabled → $enabled")
 
-        if (enabled) {
-            // 1) Clear any prior allows/dismissals
-            BlockManager.clearAllTemporarilyAllowed()
-            BlockManager.clearAllDismissed()
+            if (enabled) {
+                // 1) Wipe any old allows/dismissals & rebuild your blocklist
+                BlockManager.clearAllTemporarilyAllowed()
+                BlockManager.clearAllDismissed()
+                initializeBlockList()
 
-            // 2) Rebuild block list
-            initializeBlockList()
-
-            // 3) Figure out who’s actually in front right now
-            val current = rootInActiveWindow?.packageName?.toString()
-            val homePkg = getDefaultLauncherPackage(this)
-
-            // 4) Don’t PIN on remote‐toggle if we’re already on home, Recents, Settings, SystemUI or our own app
-            if (current == null
-                || current == applicationContext.packageName
-                || current == homePkg                              // <— skip home/launcher
-                || current in uninstallPackages                    // skip installer
-                || current.startsWith("com.android.systemui")
-                || current.startsWith("com.android.settings")
-            ) {
-                return@OnSharedPreferenceChangeListener
-            }
-
-            // 5) Otherwise, show PIN for that package
-            Handler(Looper.getMainLooper()).post {
-                startActivity(
-                    Intent(this, PinActivity::class.java).apply {
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                        putExtra("app_package", current)
+                // 2) If there’s a real 3rd-party app in front, PIN-lock it immediately
+                val current = rootInActiveWindow?.packageName?.toString()
+                val homePkg = getDefaultLauncherPackage(this)
+                if (current != null
+                    && current != applicationContext.packageName
+                    && current != homePkg
+                    && current !in uninstallPackages
+                    && !current.startsWith("com.android.systemui")
+                    && !current.startsWith("com.android.settings")
+                ) {
+                    Handler(Looper.getMainLooper()).post {
+                        startActivity(
+                            Intent(this, PinActivity::class.java).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                putExtra("app_package", current)
+                            }
+                        )
                     }
-                )
+                }
+            } else {
+                // 3) Tearing off: remove any Recents overlay or touch‐blocker you showed
+                recentsOverlay?.let {
+                    (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it)
+                    recentsOverlay = null
+                }
+                touchBlocker?.let {
+                    (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it)
+                    touchBlocker = null
+                }
+                // 4) And clear any inRecents flag so overlay logic won’t fire until real recents
+                inRecents = false
             }
         }
-    }
+
 
     private val handler = Handler(Looper.getMainLooper())
     private var removeRunnable: Runnable? = null
@@ -156,18 +163,46 @@ class AppBlockerService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
 
-        prefs = PreferenceManager.getDefaultSharedPreferences(this).also { shared ->
-            shared.registerOnSharedPreferenceChangeListener(prefListener)
-        }
-        Log.i("AppBlockerService", "🚀 Accessibility service CONNECTED, prefs initialized")
+        prefs = PreferenceManager
+            .getDefaultSharedPreferences(this)
+            .also { sp ->
+                sp.registerOnSharedPreferenceChangeListener(prefListener)
+            }
+        Log.i("AppBlockerService","…CONNECTED")
 
+        // Now enforce whatever the toggle currently says:
+        if (prefs.getBoolean("blocking_enabled", true)) {
+            initializeBlockList()
+        } else {
+            // ensure no stray overlays/touch blockers
+            recentsOverlay = null
+            touchBlocker   = null
+            inRecents      = false
+        }
+
+        // 2) Set up key-event filtering
         serviceInfo = serviceInfo.apply {
             flags = flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
         }
         Log.i("AppBlockerService", "••• serviceInfo.flags = ${serviceInfo.flags}")
 
-        if (prefs.getBoolean("blocking_enabled", true)) {
+        // 3) Enforce whatever the toggle currently says
+        val enabled = prefs.getBoolean("blocking_enabled", true)
+        if (enabled) {
+            // Build or rebuild your block list
             initializeBlockList()
+        } else {
+            // Tear down any Recents overlay or touch-blocker
+            recentsOverlay?.let {
+                (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it)
+                recentsOverlay = null
+            }
+            touchBlocker?.let {
+                (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it)
+                touchBlocker = null
+            }
+            // Reset Recents flag so overlay logic won't fire accidentally
+            inRecents = false
         }
     }
 

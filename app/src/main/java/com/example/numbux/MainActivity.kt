@@ -196,19 +196,19 @@ class MainActivity : ComponentActivity() {
 
     private fun showEnableAccessibilityDialog() {
         AlertDialog.Builder(this)
-        .setTitle("NumbuX sin Permisos")
-        .setMessage(
-            "Para que NumbuX funcione correctamente, ve a:\n" +
-                    "\n" +
-                    "1. Accesibilidad → Apps Instaladas\n" +
-                    "\n" +
-                    "2. Numbux → ON → Aceptar"
-        )
-        .setCancelable(false)
-        .setPositiveButton("Abrir Ajustes") { _, _ ->
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-        }
-        .show()
+            .setTitle("NumbuX sin Permisos")
+            .setMessage(
+                "Para que NumbuX funcione correctamente, ve a:\n" +
+                        "\n" +
+                        "1. Accesibilidad → Apps Instaladas\n" +
+                        "\n" +
+                        "2. Numbux → ON → Aceptar"
+            )
+            .setCancelable(false)
+            .setPositiveButton("Abrir Ajustes") { _, _ ->
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+            .show()
     }
 
     private fun showDisablePinDialog(onResult: (Boolean) -> Unit) {
