@@ -310,15 +310,16 @@ class AppBlockerService : AccessibilityService() {
         // 9) Skip temporarily-allowed
         if (BlockManager.isTemporarilyAllowed(pkg)) return
 
-        // 10) Finally: PIN-lock regular apps
-        Handler(Looper.getMainLooper()).postDelayed({
-            if (rootInActiveWindow?.packageName == pkg
-                && BlockManager.isAppBlocked(pkg)
-                && !BlockManager.isTemporarilyAllowed(pkg)
-            ) {
-                sendPinBroadcast(pkg)
-            }
-        }, 200)
+        // ——— 10) Immediately lock the blocked app ———
+        if (type == TYPE_WINDOW_STATE_CHANGED && BlockManager.isAppBlocked(pkg)) {
+            Log.d("AppBlockerService", "⏱ Prompting PIN for $pkg immediately")
+            // fire the PIN screen *right now*, no delay:
+            startActivity(Intent(this, PinActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                putExtra("app_package", pkg)
+            })
+            return
+        }
     }
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
