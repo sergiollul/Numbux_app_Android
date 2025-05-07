@@ -58,7 +58,7 @@ class LoginActivity : ComponentActivity() {
                             .padding(24.dp),
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Text("Acceso Numbux", style = MaterialTheme.typography.headlineSmall)
+                        Text("Introduce tu usuario", style = MaterialTheme.typography.headlineSmall)
                         Spacer(Modifier.height(16.dp))
                         OutlinedTextField(
                             value = credential,

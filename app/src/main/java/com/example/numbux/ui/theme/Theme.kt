@@ -1,42 +1,62 @@
 package com.example.numbux.ui.theme
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
-)
+// Brand colors defined in Color.kt
+//   val Orange6300: Color
+//   val White: Color
+//   val Black: Color
+//   val ErrorLight: Color
+//   val ErrorDark: Color
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
+    primary = Orange6300,
+    onPrimary = White,
+    primaryContainer = Orange6300,
+    onPrimaryContainer = White,
 
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    secondary = Orange6300,
+    onSecondary = White,
+    secondaryContainer = Orange6300,
+    onSecondaryContainer = White,
+
+    background = Black,
+    onBackground = White,
+    surface = Black,
+    onSurface = White,
+
+    error = ErrorLight,
+    onError = White
+)
+
+private val DarkColorScheme = darkColorScheme(
+    primary = Orange6300,
+    onPrimary = Black,
+    primaryContainer = Orange6300,
+    onPrimaryContainer = Black,
+
+    secondary = Orange6300,
+    onSecondary = Black,
+    secondaryContainer = Orange6300,
+    onSecondaryContainer = Black,
+
+    background = Black,
+    onBackground = White,
+    surface = Black,
+    onSurface = White,
+
+    error = ErrorDark,
+    onError = Black
 )
 
 @Composable
 fun NumbuxTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
@@ -44,7 +64,6 @@ fun NumbuxTheme(
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }

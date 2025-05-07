@@ -77,6 +77,16 @@ class MainActivity : ComponentActivity() {
 
         // 3) Initialize SharedPreferences & Compose state
         prefs = PreferenceManager.getDefaultSharedPreferences(this)
+
+        // ————— First-run initialization —————
+        if (!prefs.getBoolean("has_initialized", false)) {
+            // On a brand-new install, force the toggle OFF:
+            prefs.edit()
+                .putBoolean("blocking_enabled", false)
+                .putBoolean("has_initialized", true)
+                .apply()
+        }
+
         blockingState = mutableStateOf(prefs.getBoolean("blocking_enabled", false))
 
         // 4) Listen for external prefs changes
@@ -111,7 +121,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val enabled by blockingState
             NumbuxTheme {
-                Scaffold(topBar = { TopAppBar(title = { Text("Numbux") }) }) { inner ->
+                Scaffold(topBar = { TopAppBar(title = { Text("NumbuX") }) }) { inner ->
                     Column(
                         Modifier
                             .fillMaxSize()
@@ -120,7 +130,7 @@ class MainActivity : ComponentActivity() {
                         verticalArrangement = Arrangement.spacedBy(20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("Bienvenido a Numbux",
+                        Text("Bienvenido a NumbuX",
                             style = MaterialTheme.typography.headlineSmall)
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -163,11 +173,11 @@ class MainActivity : ComponentActivity() {
         if (!isAccessibilityServiceEnabled(this)) {
             if (accessibilityDialog?.isShowing != true) {
                 accessibilityDialog = AlertDialog.Builder(this)
-                    .setTitle("Numbux sin Permisos")
+                    .setTitle("NumbuX sin Permisos")
                     .setMessage(
-                        "Para que Numbux funcione correctamente, ve a:\n" +
+                        "Para que NumbuX funcione correctamente, ve a:\n" +
                                 "\n1. Accesibilidad → Apps Instaladas\n" +
-                                "\n2. Numbux → ON → Aceptar"
+                                "\n2. NumbuX → ON → Aceptar"
                     )
                     .setCancelable(false)
                     .setPositiveButton("Abrir Ajustes") { _, _ ->
@@ -202,7 +212,7 @@ class MainActivity : ComponentActivity() {
                         "\n" +
                         "1. Accesibilidad → Apps Instaladas\n" +
                         "\n" +
-                        "2. Numbux → ON → Aceptar"
+                        "2. NumbuX → ON → Aceptar"
             )
             .setCancelable(false)
             .setPositiveButton("Abrir Ajustes") { _, _ ->
