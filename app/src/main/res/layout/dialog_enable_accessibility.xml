@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:background="@drawable/dialog_background"
+    android:padding="24dp"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <!-- Title -->
+    <TextView
+        android:id="@+id/tvDialogTitle"
+        style="@style/TextAppearance.Material3.HeadlineSmall"
+        android:text="NumbuX sin Permisos"
+        android:textColor="@color/white"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+
+    <!-- Message -->
+    <TextView
+        android:id="@+id/tvDialogMessage"
+        style="@style/TextAppearance.Material3.BodyMedium"
+        android:layout_marginTop="16dp"
+        android:text="Para que NumbuX funcione correctamente, ve a: \n
+        \n1. Apps Instaladas → NumbuX\n
+        \n2. ON → Permitir"
+        android:textColor="@color/white"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+</LinearLayout>

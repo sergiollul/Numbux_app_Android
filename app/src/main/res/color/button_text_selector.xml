@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Pressed: black text on orange -->
+    <item android:state_pressed="true"
+        android:color="@android:color/black"/>
+    <!-- Default: orange text -->
+    <item android:color="@color/orange_6300"/>
+</selector>

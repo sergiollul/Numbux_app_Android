@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Pressed state: orange background -->
+    <item android:state_pressed="true"
+        android:drawable="@color/orange_6300"/>
+    <!-- Default: transparent so it just looks like text -->
+    <item android:drawable="@android:color/transparent"/>
+</selector>

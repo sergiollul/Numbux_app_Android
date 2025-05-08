@@ -32,18 +32,19 @@ import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.core.view.WindowCompat
-
 import android.content.SharedPreferences
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
-
 import android.content.Context
-
 import android.view.accessibility.AccessibilityManager
 import android.accessibilityservice.AccessibilityServiceInfo
-
-
-
+import androidx.core.content.ContextCompat
+import android.view.Gravity
+import android.widget.Button
+import android.widget.FrameLayout
+import android.graphics.Color
+import android.view.ViewTreeObserver
+import android.graphics.drawable.ColorDrawable
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -170,20 +171,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+
         if (!isAccessibilityServiceEnabled(this)) {
             if (accessibilityDialog?.isShowing != true) {
-                accessibilityDialog = AlertDialog.Builder(this)
-                    .setTitle("NumbuX sin Permisos")
-                    .setMessage(
-                        "Para que NumbuX funcione correctamente, ve a:\n" +
-                                "\n1. Accesibilidad → Apps Instaladas\n" +
-                                "\n2. NumbuX → ON → Aceptar"
-                    )
-                    .setCancelable(false)
-                    .setPositiveButton("Abrir Ajustes") { _, _ ->
-                        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                    }
-                    .show()
+                showEnableAccessibilityDialog()
             }
         } else {
             accessibilityDialog?.dismiss()
@@ -205,20 +196,61 @@ class MainActivity : ComponentActivity() {
 
 
     private fun showEnableAccessibilityDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("NumbuX sin Permisos")
-            .setMessage(
-                "Para que NumbuX funcione correctamente, ve a:\n" +
-                        "\n" +
-                        "1. Accesibilidad → Apps Instaladas\n" +
-                        "\n" +
-                        "2. NumbuX → ON → Aceptar"
-            )
+        // 1) Inflate your custom content (title + message)
+        val custom = layoutInflater.inflate(
+            R.layout.dialog_enable_accessibility,
+            null,
+            false
+        )
+
+        // 2) Build & show *with* our no-shadow style
+        val dlg = AlertDialog.Builder(this, R.style.NoShadowDialog)
+            .setView(custom)
             .setCancelable(false)
-            .setPositiveButton("Abrir Ajustes") { _, _ ->
-                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-            }
             .show()
+
+        // 3) Force the window’s background to fully transparent
+        dlg.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+
+        // 4) Wait until our custom view is measured, so we know its height
+        custom.viewTreeObserver.addOnGlobalLayoutListener(object : ViewTreeObserver.OnGlobalLayoutListener {
+            override fun onGlobalLayout() {
+                custom.viewTreeObserver.removeOnGlobalLayoutListener(this)
+
+                // height of the dialog’s content
+                val dialogHeightPx = custom.height
+
+                // 5) Create the “Abrir Ajustes” button
+                val btn = Button(this@MainActivity).apply {
+                    text = "Abrir Ajustes"
+                    // use our new selectors
+                    background = ContextCompat.getDrawable(context, R.drawable.button_bg_pressed_selector)
+                    setTextColor(ContextCompat.getColorStateList(context, R.color.button_text_pressed_selector))
+                    val pad = (16 * resources.displayMetrics.density).toInt()
+                    setPadding(pad, pad/2, pad, pad/2)
+                    setOnClickListener {
+                        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                        dlg.dismiss()
+                    }
+                }
+
+                // 6) Inject the button just *below* the dialog content
+                dlg.window
+                    ?.decorView
+                    ?.findViewById<FrameLayout>(android.R.id.content)
+                    ?.let { container ->
+                        val topMarginPx = dialogHeightPx + (8 * resources.displayMetrics.density).toInt()
+                        val params = FrameLayout.LayoutParams(
+                            FrameLayout.LayoutParams.WRAP_CONTENT,
+                            FrameLayout.LayoutParams.WRAP_CONTENT
+                        ).apply {
+                            gravity = Gravity.CENTER_HORIZONTAL or Gravity.TOP
+                            this.topMargin = topMarginPx
+                        }
+                        container.addView(btn, params)
+                    }
+            }
+        })
     }
 
     private fun showDisablePinDialog(onResult: (Boolean) -> Unit) {
