@@ -5,12 +5,18 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.preference.PreferenceManager
 import androidx.core.app.ActivityCompat
@@ -18,6 +24,11 @@ import androidx.core.content.ContextCompat
 import com.example.numbux.ui.theme.NumbuxTheme
 import com.example.numbux.utils.AccessibilityUtils
 import com.example.numbux.notifications.NotificationUtils
+import androidx.compose.ui.Alignment
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearOutSlowInEasing
+
+
 
 class LoginActivity : ComponentActivity() {
 
@@ -28,7 +39,10 @@ class LoginActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 1) Comprueba si ya tenemos un rol guardado
+        // Make the window resize when the keyboard appears
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+
+        // 1) Check saved role
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
         when (prefs.getString("role", null)) {
             "controller" -> {
@@ -36,7 +50,6 @@ class LoginActivity : ComponentActivity() {
                 return
             }
             "student" -> {
-                // Si ya tiene rol de estudiante y accesibilidad activa, cancelar notificación
                 if (AccessibilityUtils.isAccessibilityEnabled(this)) {
                     NotificationUtils.cancelAccessibilityNotification(this)
                 }
@@ -45,35 +58,59 @@ class LoginActivity : ComponentActivity() {
             }
         }
 
-        // 2) Mostrar la pantalla de login
+        // 2) Show login UI
         setContent {
+            // — state for the text field & error —
             var credential by remember { mutableStateOf("") }
             var error by remember { mutableStateOf<String?>(null) }
 
+            // — compute & animate IME inset —
+            val density = LocalDensity.current
+            val imeBottomPx = WindowInsets.ime.getBottom(density)
+            val imeBottomDp = with(density) { imeBottomPx.toDp() }
+            val animatedImeDp by animateDpAsState(
+                targetValue = imeBottomDp,
+                animationSpec = tween(
+                    durationMillis = 30_000,             // <-- 30s instead of 300ms
+                    easing = LinearOutSlowInEasing      // optional smoother easing
+                )
+            )
+
             NumbuxTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp)
+                        .padding(bottom = animatedImeDp) // smooth slide up
+                ) {
                     Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        verticalArrangement = Arrangement.Center
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("Introduce tu usuario", style = MaterialTheme.typography.headlineSmall)
+                        Text(
+                            "Introduce tu usuario",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
                         Spacer(Modifier.height(16.dp))
+
                         OutlinedTextField(
                             value = credential,
-                            onValueChange = {
-                                credential = it
+                            onValueChange = { new ->
+                                credential = new
                                 error = null
                             },
                             label = { Text("Clave de acceso") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
+
                         error?.let { e ->
                             Spacer(Modifier.height(8.dp))
-                            Text(e, color = MaterialTheme.colorScheme.error)
+                            Text(text = e, color = MaterialTheme.colorScheme.error)
                         }
+
                         Spacer(Modifier.height(24.dp))
                         Button(
                             onClick = { handleLogin(credential.trim(), prefs) },
@@ -87,7 +124,10 @@ class LoginActivity : ComponentActivity() {
         }
     }
 
-    private fun handleLogin(credential: String, prefs: android.content.SharedPreferences) {
+    private fun handleLogin(
+        credential: String,
+        prefs: android.content.SharedPreferences
+    ) {
         when (credential) {
             "profesor1234" -> {
                 prefs.edit().putString("role", "controller").apply()
@@ -98,13 +138,13 @@ class LoginActivity : ComponentActivity() {
                 requestOrShowNotification()
             }
             else -> {
-                // Aquí podrías mostrar un error de UI; en este diseño se ignora
+                // e.g. set error state if you want:
+                // error = "Clave incorrecta"
             }
         }
     }
 
     private fun requestOrShowNotification() {
-        // Para Android 13+ pedimos permiso POST_NOTIFICATIONS
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(
                 this,
@@ -117,7 +157,6 @@ class LoginActivity : ComponentActivity() {
                 NOTIF_REQUEST_CODE
             )
         } else {
-            // Si no hay accesibilidad activada, mostramos notificación fija
             if (!AccessibilityUtils.isAccessibilityEnabled(this)) {
                 NotificationUtils.showPersistentAccessibilityNotification(this)
             }
