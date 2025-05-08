@@ -14,6 +14,8 @@ import android.view.View
 import androidx.preference.PreferenceManager
 import com.example.numbux.R
 import com.example.numbux.control.BlockManager
+import android.app.KeyguardManager
+import android.content.Context
 
 class PinActivity : Activity() {
     companion object {
@@ -31,34 +33,39 @@ class PinActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 0) Si el teléfono está en lockscreen, no mostramos PIN: salimos
+        val km = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        if (km.isKeyguardLocked) {
+            finish()
+            return
+        }
+
+        // 1) Inflamos la UI
         setContentView(R.layout.activity_pin)
 
-        // read the incoming target
+        // 2) Leemos el paquete objetivo y elegimos PIN
         targetPkg = intent.getStringExtra("app_package")
-
-        // pick the right PIN
         val appLockPin = PreferenceManager
             .getDefaultSharedPreferences(this)
             .getString("pin_app_lock", "1234") ?: "1234"
         correctPin = if (targetPkg in SYSTEM_PACKAGES) SYSTEM_PIN else appLockPin
 
+        // 3) Botón de desbloqueo
         findViewById<Button>(R.id.buttonUnlock).setOnClickListener {
-            if (findViewById<EditText>(R.id.editTextPin).text.toString() == correctPin) {
-                onPinCorrect()
-            } else {
-                Toast.makeText(this, "PIN incorrecto", Toast.LENGTH_SHORT).show()
-            }
+            val entered = findViewById<EditText>(R.id.editTextPin).text.toString()
+            if (entered == correctPin) onPinCorrect()
+            else Toast.makeText(this, "PIN incorrecto", Toast.LENGTH_SHORT).show()
         }
 
-        // keep screen on / show over lock
-        window.addFlags(
-            WindowManager.LayoutParams.FLAG_FULLSCREEN or
-                    WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
-                    WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                    WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
-                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-        )
+        // 4) Quitamos las flags SHOW_WHEN_LOCKED / DISMISS_KEYGUARD
+        //    (Ahora la Activity solo aparece si ya desbloqueaste la pantalla)
+        //    window.addFlags(
+        //      WindowManager.LayoutParams.FLAG_FULLSCREEN or
+        //      WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+        //    )
     }
+
 
     private fun onPinCorrect() {
         // stop the service from re-showing PIN
