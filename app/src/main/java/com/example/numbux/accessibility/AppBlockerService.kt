@@ -29,6 +29,13 @@ import android.view.Gravity
 import android.util.DisplayMetrics
 import android.view.accessibility.AccessibilityEvent.*
 
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.ValueEventListener
+import com.google.firebase.database.ktx.database
+import com.google.firebase.ktx.Firebase
+
+
 
 class AppBlockerService : AccessibilityService() {
 
@@ -168,42 +175,54 @@ class AppBlockerService : AccessibilityService() {
             .also { sp ->
                 sp.registerOnSharedPreferenceChangeListener(prefListener)
             }
-        Log.i("AppBlockerService","…CONNECTED")
+        Log.i("AppBlockerService", "…CONNECTED")
 
-        // Now enforce whatever the toggle currently says:
-        if (prefs.getBoolean("blocking_enabled", true)) {
+        // ——— Remote toggle listener via Firebase ———
+        val room = "testRoom"
+        val firebaseUrl = "https://numbux-790d6-default-rtdb.europe-west1.firebasedatabase.app"
+        val dbRef = Firebase
+            .database(firebaseUrl)
+            .getReference("rooms")
+            .child(room)
+            .child("blocking_enabled")
+
+        dbRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                snapshot.getValue(Boolean::class.java)?.let { remoteEnabled ->
+                    prefs.edit().putBoolean("blocking_enabled", remoteEnabled).apply()
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {
+                Log.w("AppBlockerService", "Remote toggle listen failed", error.toException())
+            }
+        })
+
+        // ——— Enforce the current toggle state ———
+        val enabled = prefs.getBoolean("blocking_enabled", false)  // default = OFF
+
+        // grab WindowManager once
+        val wm = getSystemService(WINDOW_SERVICE) as WindowManager
+
+        if (enabled) {
             initializeBlockList()
         } else {
-            // ensure no stray overlays/touch blockers
-            recentsOverlay = null
-            touchBlocker   = null
-            inRecents      = false
+            // tear down any overlays / blockers
+            recentsOverlay?.let {
+                wm.removeView(it)
+                recentsOverlay = null
+            }
+            touchBlocker?.let {
+                wm.removeView(it)
+                touchBlocker = null
+            }
+            inRecents = false
         }
 
-        // 2) Set up key-event filtering
+        // ——— Now request key‐events ———
         serviceInfo = serviceInfo.apply {
             flags = flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
         }
         Log.i("AppBlockerService", "••• serviceInfo.flags = ${serviceInfo.flags}")
-
-        // 3) Enforce whatever the toggle currently says
-        val enabled = prefs.getBoolean("blocking_enabled", true)
-        if (enabled) {
-            // Build or rebuild your block list
-            initializeBlockList()
-        } else {
-            // Tear down any Recents overlay or touch-blocker
-            recentsOverlay?.let {
-                (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it)
-                recentsOverlay = null
-            }
-            touchBlocker?.let {
-                (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it)
-                touchBlocker = null
-            }
-            // Reset Recents flag so overlay logic won't fire accidentally
-            inRecents = false
-        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
