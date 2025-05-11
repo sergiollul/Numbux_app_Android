@@ -58,6 +58,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.OpenDocument
 import androidx.activity.compose.rememberLauncherForActivityResult
+import java.io.File
+import java.io.FileInputStream
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
+
+
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -78,6 +84,7 @@ class MainActivity : ComponentActivity() {
         set(value) = prefs.edit().putString("backup_wallpaper_uri", value?.toString()).apply()
 
     private lateinit var dbRef: DatabaseReference
+    private var wallpaperChangedReceiver: BroadcastReceiver? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -138,25 +145,41 @@ class MainActivity : ComponentActivity() {
             }
         })
 
+        // register a receiver that toasts when the wallpaper changes
+        val filter = IntentFilter(Intent.ACTION_WALLPAPER_CHANGED)
+        wallpaperChangedReceiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context, intent: Intent) {
+                Toast.makeText(
+                    this@MainActivity,
+                    "Tu fondo ha cambiado: haz backup de nuevo",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+        registerReceiver(wallpaperChangedReceiver, filter)
+
         // 6) Now set up your Compose UI
         setContent {
             val enabled by blockingState
             val context = LocalContext.current
 
-            // 1) Create an OpenDocument launcher
+            // 1) En tu Launcher:
             val pickWallpaperLauncher = rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.OpenDocument(),
                 onResult = { uri: Uri? ->
                     uri?.let {
-                        // 1) Toma permiso persistente para leer este URI siempre
+                        // toma permiso persistente
                         context.contentResolver.takePersistableUriPermission(
                             it,
                             Intent.FLAG_GRANT_READ_URI_PERMISSION
                         )
+                        // copia bytes a fichero interno
+                        val input = context.contentResolver.openInputStream(it)!!
+                        val dst = File(context.filesDir, "wallpaper_backup.png").outputStream()
+                        input.copyTo(dst)
+                        input.close(); dst.close()
 
-                        // 2) Guárdalo en prefs
-                        backupWallpaperUri = it
-                        Toast.makeText(context, "Fondo guardado.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Fondo guardado en app.", Toast.LENGTH_SHORT).show()
                     }
                 }
             )
@@ -224,24 +247,7 @@ class MainActivity : ComponentActivity() {
                 if (!success) return@showDisablePinDialog
 
                 // 1) restaurar condicionalmente
-                val uri = backupWallpaperUri
-                if (uri == null) {
-                    Toast.makeText(
-                        this,
-                        "No tienes un fondo guardado para restaurar",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                } else {
-                    try {
-                        contentResolver.openInputStream(uri)?.use { stream ->
-                            wm.setStream(stream)
-                        }
-                    } catch (e: Exception) {
-                        Log.e("MainActivity", "Error al restaurar el fondo", e)
-                        Toast.makeText(this, "Error al restaurar el fondo", Toast.LENGTH_SHORT)
-                            .show()
-                    }
-                }
+                restoreWallpaper(wm)
 
                 // 2) marcar OFF
                 prefs.edit().putBoolean("blocking_enabled", false).apply()
@@ -249,6 +255,18 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    private fun restoreWallpaper(wm: WallpaperManager) {
+        val f = File(filesDir, "wallpaper_backup.png")
+        if (!f.exists()) {
+            Toast.makeText(this, "No hay backup de fondo", Toast.LENGTH_SHORT).show()
+            return
+        }
+        FileInputStream(f).use { stream ->
+            wm.setStream(stream)
+        }
+    }
+
 
     override fun onResume() {
         super.onResume()
@@ -369,6 +387,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        wallpaperChangedReceiver?.let { unregisterReceiver(it) }
         super.onDestroy()
         prefs.unregisterOnSharedPreferenceChangeListener(prefListener)
     }
