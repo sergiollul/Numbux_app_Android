@@ -52,7 +52,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.example.numbux.ui.BlockerToggle
 import android.os.Build
 import android.os.Build.VERSION_CODES
-import com.example.numbux.ui.BackupWallpaperButton
+import com.example.numbux.ui.RestoreWallpaperButton
 import com.google.firebase.database.DatabaseReference
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -199,17 +199,25 @@ class MainActivity : ComponentActivity() {
                             style = MaterialTheme.typography.headlineSmall
                                     )
 
-                        // 5) **Show the button only if we haven't already backed up**:
-                        if (backupWallpaperUri == null) {
-                            Button(
-                                onClick = {
-                                    // Launch the SAF picker when clicked
-                                    pickWallpaperLauncher.launch(arrayOf("image/*"))
-                                }
-                            ) {
-                                Text("Selecciona tu fondo para restaurar")
+                        // inside your Column, replacing the old if‐button block:
+                        RestoreWallpaperButton(
+                            initialUri = backupWallpaperUri,
+                            onUriPicked = { uri ->
+                                // 1) save the picked URI to prefs
+                                backupWallpaperUri = uri
+
+                                // 2) copy it into your internal file
+                                val input = context.contentResolver.openInputStream(uri)!!
+                                val dst = File(context.filesDir, "wallpaper_backup.png").outputStream()
+                                input.copyTo(dst)
+                                input.close(); dst.close()
+
+                                // 3) show your one-time Toast
+                                Toast
+                                    .makeText(context, "¡Fondo guardado!", Toast.LENGTH_SHORT)
+                                    .show()
                             }
-                        }
+                        )
 
                         // ← call your new composable here:
                         BlockerToggle(
