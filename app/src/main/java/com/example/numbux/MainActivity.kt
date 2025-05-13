@@ -86,6 +86,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var dbRef: DatabaseReference
     private var wallpaperChangedReceiver: BroadcastReceiver? = null
 
+    private var lastInternalWallpaperChange: Long = 0L
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -149,6 +151,10 @@ class MainActivity : ComponentActivity() {
         val filter = IntentFilter(Intent.ACTION_WALLPAPER_CHANGED)
         wallpaperChangedReceiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, intent: Intent) {
+                val now = System.currentTimeMillis()
+                // Si la diferencia es menor a 2 segundos, es un cambio interno: lo ignoramos
+                if (now - lastInternalWallpaperChange < 2000) return
+
                 Toast.makeText(
                     this@MainActivity,
                     "Tu fondo ha cambiado: haz backup de nuevo",
@@ -239,6 +245,8 @@ class MainActivity : ComponentActivity() {
 
     private fun handleBlockingToggle(isOn: Boolean, wm: WallpaperManager) {
         if (isOn) {
+            lastInternalWallpaperChange = System.currentTimeMillis()
+
             // 1) Create & set a pure-black wallpaper
             val w = wm.desiredMinimumWidth
             val h = wm.desiredMinimumHeight
@@ -254,7 +262,8 @@ class MainActivity : ComponentActivity() {
             showDisablePinDialog { success ->
                 if (!success) return@showDisablePinDialog
 
-                // 1) restaurar condicionalmente
+                // When restoring, also stamp the time so your receiver ignores it:
+                lastInternalWallpaperChange = System.currentTimeMillis()
                 restoreWallpaper(wm)
 
                 // 2) marcar OFF
