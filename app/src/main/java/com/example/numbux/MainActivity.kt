@@ -62,6 +62,10 @@ import java.io.File
 import java.io.FileInputStream
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
+import android.app.WallpaperManager.OnColorsChangedListener
+import android.os.Handler
+import android.os.Looper
+import android.app.WallpaperColors
 
 
 
@@ -86,7 +90,10 @@ class MainActivity : ComponentActivity() {
     private lateinit var dbRef: DatabaseReference
     private var wallpaperChangedReceiver: BroadcastReceiver? = null
 
+    private lateinit var wallpaperColorsListener: WallpaperManager.OnColorsChangedListener
     private var lastInternalWallpaperChange: Long = 0L
+    private lateinit var showBackupPrompt: MutableState<Boolean>
+    private var lastSeenColors: WallpaperColors? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -107,22 +114,18 @@ class MainActivity : ComponentActivity() {
 
         // 3) Initialize SharedPreferences & Compose state
         prefs = PreferenceManager.getDefaultSharedPreferences(this)
-
         // ————— First-run initialization —————
         if (!prefs.getBoolean("has_initialized", false)) {
-            // On a brand-new install, force the toggle OFF:
             prefs.edit()
                 .putBoolean("blocking_enabled", false)
                 .putBoolean("has_initialized", true)
                 .apply()
         }
-
         blockingState = mutableStateOf(prefs.getBoolean("blocking_enabled", false))
 
         // 4) Listen for external prefs changes
         prefListener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
             if (key == "blocking_enabled") {
-                // update our Compose state
                 blockingState.value = sp.getBoolean(key, false)
             }
         }
@@ -139,7 +142,6 @@ class MainActivity : ComponentActivity() {
         dbRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val remote = snapshot.getValue(Boolean::class.java) ?: false
-                // write to prefs *and* state – triggers our prefListener
                 prefs.edit().putBoolean("blocking_enabled", remote).apply()
             }
             override fun onCancelled(error: DatabaseError) {
@@ -147,99 +149,112 @@ class MainActivity : ComponentActivity() {
             }
         })
 
-        // register a receiver that toasts when the wallpaper changes
-        val filter = IntentFilter(Intent.ACTION_WALLPAPER_CHANGED)
-        wallpaperChangedReceiver = object : BroadcastReceiver() {
-            override fun onReceive(ctx: Context, intent: Intent) {
-                val now = System.currentTimeMillis()
-                // Si la diferencia es menor a 2 segundos, es un cambio interno: lo ignoramos
-                if (now - lastInternalWallpaperChange < 2000) return
+        // 6) Initialize our “haz backup” prompt flag and last-internal-change timestamp
+        showBackupPrompt = mutableStateOf(false)
+        lastInternalWallpaperChange = 0L
 
-                Toast.makeText(
-                    this@MainActivity,
-                    "Tu fondo ha cambiado: haz backup de nuevo",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
+        // NEW: grab the initial wallpaper colors so we have a baseline
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            lastSeenColors = WallpaperManager
+            .getInstance(this)
+            .getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
         }
-        registerReceiver(wallpaperChangedReceiver, filter)
 
-        // 6) Now set up your Compose UI
+        // 7) Register a listener for any wallpaper change (internal or external)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            val wm = WallpaperManager.getInstance(this)
+            val handler = Handler(Looper.getMainLooper())
+
+            wallpaperColorsListener = OnColorsChangedListener { colors, which ->
+                val now = System.currentTimeMillis()
+                if (now - lastInternalWallpaperChange < 2_000) return@OnColorsChangedListener
+                runOnUiThread { showBackupPrompt.value = true }
+            }
+
+            wm.addOnColorsChangedListener(wallpaperColorsListener, handler)
+        }
+        else {
+            wallpaperChangedReceiver = object : BroadcastReceiver() {
+                override fun onReceive(ctx: Context, intent: Intent) {
+                    val now = System.currentTimeMillis()
+                    if (now - lastInternalWallpaperChange < 2_000) return
+                    runOnUiThread { showBackupPrompt.value = true }
+                }
+            }
+            registerReceiver(
+                wallpaperChangedReceiver,
+                IntentFilter(Intent.ACTION_WALLPAPER_CHANGED)
+            )
+        }
+
+        // 8) Now set up your Compose UI
         setContent {
             val enabled by blockingState
+            val showPrompt by showBackupPrompt
             val context = LocalContext.current
 
-            // 1) En tu Launcher:
+            // SAF picker launcher
             val pickWallpaperLauncher = rememberLauncherForActivityResult(
-                contract = ActivityResultContracts.OpenDocument(),
-                onResult = { uri: Uri? ->
-                    uri?.let {
-                        // toma permiso persistente
-                        context.contentResolver.takePersistableUriPermission(
-                            it,
-                            Intent.FLAG_GRANT_READ_URI_PERMISSION
-                        )
-                        // copia bytes a fichero interno
-                        val input = context.contentResolver.openInputStream(it)!!
-                        val dst = File(context.filesDir, "wallpaper_backup.png").outputStream()
+                contract = ActivityResultContracts.OpenDocument()
+            ) { uri: Uri? ->
+                uri?.also {
+                    context.contentResolver.takePersistableUriPermission(
+                        it, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                    // persist to prefs + internal file
+                    backupWallpaperUri = it
+                    val input = context.contentResolver.openInputStream(it)!!
+                    File(context.filesDir, "wallpaper_backup.png").outputStream().use { dst ->
                         input.copyTo(dst)
-                        input.close(); dst.close()
-
-                        Toast.makeText(context, "Fondo guardado en app.", Toast.LENGTH_SHORT).show()
                     }
+                    Toast.makeText(context, "Fondo guardado en app.", Toast.LENGTH_SHORT).show()
+                    // hide the prompt
+                    showBackupPrompt.value = false
                 }
-            )
+            }
 
             NumbuxTheme {
                 Scaffold(topBar = { TopAppBar(title = { Text("NumbuX") }) }) { inner ->
                     Column(
                         Modifier
-                                .fillMaxSize()
-                                .padding(inner)
-                                .padding(24.dp),
+                            .fillMaxSize()
+                            .padding(inner)
+                            .padding(24.dp),
                         verticalArrangement = Arrangement.spacedBy(20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                        Text(
-                            "Bienvenido a NumbuX",
-                            style = MaterialTheme.typography.headlineSmall
-                                    )
+                    ) {
+                        Text("Bienvenido a NumbuX", style = MaterialTheme.typography.headlineSmall)
 
-                        // inside your Column, replacing the old if‐button block:
+                        // ← persistent “haz backup” button if wallpaper changed externally
+                        if (showPrompt) {
+                            Button(onClick = { pickWallpaperLauncher.launch(arrayOf("image/*")) }) {
+                                Text("Tu fondo ha cambiado: haz backup de nuevo")
+                            }
+                        }
+
+                        // ← your existing restore‐button composable
                         RestoreWallpaperButton(
                             initialUri = backupWallpaperUri,
                             onUriPicked = { uri ->
-                                // 1) save the picked URI to prefs
+                                // note: this runs only on first‐ever backup
                                 backupWallpaperUri = uri
-
-                                // 2) copy it into your internal file
                                 val input = context.contentResolver.openInputStream(uri)!!
-                                val dst = File(context.filesDir, "wallpaper_backup.png").outputStream()
-                                input.copyTo(dst)
-                                input.close(); dst.close()
-
-                                // 3) show your one-time Toast
-                                Toast
-                                    .makeText(context, "¡Fondo guardado!", Toast.LENGTH_SHORT)
-                                    .show()
+                                File(context.filesDir, "wallpaper_backup.png").outputStream().use { dst ->
+                                    input.copyTo(dst)
+                                }
+                                Toast.makeText(context, "Fondo guardado en app.", Toast.LENGTH_SHORT).show()
                             }
                         )
 
-                        // ← call your new composable here:
-                        BlockerToggle(
-                            enabled = enabled,
-                            onToggle = ::handleBlockingToggle
-                                    )
-
-                        // ← keep the status text if you like
+                        BlockerToggle(enabled = enabled, onToggle = ::handleBlockingToggle)
                         Text(
                             if (enabled) "El bloqueador está ACTIVADO"
-                                    else "El bloqueador está DESACTIVADO",
+                            else "El bloqueador está DESACTIVADO",
                             style = MaterialTheme.typography.bodyMedium
-                                    )
-                        }
+                        )
                     }
                 }
+            }
         }
     }
 
@@ -287,6 +302,21 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+
+        // NEW: see if the user changed the wallpaper while we were away
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            val wm = WallpaperManager.getInstance(this)
+            val current = wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
+            // if it's really different, and not our own internal flip:
+            if (current != lastSeenColors) {
+                val now = System.currentTimeMillis()
+                if (now - lastInternalWallpaperChange > 2_000) {
+                    showBackupPrompt.value = true
+                }
+                // remember this new state so we don't prompt repeatedly
+                lastSeenColors = current
+            }
+        }
 
         if (!isAccessibilityServiceEnabled(this)) {
             if (accessibilityDialog?.isShowing != true) {
@@ -404,8 +434,13 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        wallpaperChangedReceiver?.let { unregisterReceiver(it) }
         super.onDestroy()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            WallpaperManager.getInstance(this)
+                .removeOnColorsChangedListener(wallpaperColorsListener)
+        } else {
+            unregisterReceiver(wallpaperChangedReceiver)
+        }
         prefs.unregisterOnSharedPreferenceChangeListener(prefListener)
     }
 }
