@@ -77,6 +77,7 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val REQ_OVERLAY = 1001
         private const val KEY_LAST_BACKUP_COLOR = "last_backup_primary_color"
+        private const val PREF_LAST_INTERNAL_CHANGE = "last_internal_wallpaper_change"
     }
 
     private lateinit var prefs: SharedPreferences
@@ -102,19 +103,15 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) return
 
         val wm = WallpaperManager.getInstance(this)
-        val currColor = wm
-            .getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
+        val curr = wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
             ?.primaryColor
             ?.toArgb()
             ?: -1
+        val saved = prefs.getInt(KEY_LAST_BACKUP_COLOR, -1)
 
-        val savedColor = prefs.getInt(KEY_LAST_BACKUP_COLOR, -1)
-        if (savedColor != -1 && currColor != savedColor) {
-            Log.d("MainActivity", "Wallpaper changed: curr=$currColor saved=$savedColor → prompt")
+        if (saved != -1 && curr != saved) {
             showBackupPrompt.value = true
-            prefs.edit()
-                .putBoolean("backup_prompt_pending", true)
-                .apply()
+            prefs.edit().putBoolean("backup_prompt_pending", true).apply()
         }
     }
 
@@ -290,6 +287,11 @@ class MainActivity : ComponentActivity() {
 
                                 // hide the “haz backup” prompt permanently
                                 showBackupPrompt.value = false
+                                // record that we just wrote a backup (and implicitly set wallpaper)
+                                prefs.edit()
+                                .putLong(PREF_LAST_INTERNAL_CHANGE, System.currentTimeMillis())
+                                .apply()
+
                                 @SuppressLint("NewApi")
                                 val primaryColor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
                                     WallpaperManager
@@ -331,6 +333,10 @@ class MainActivity : ComponentActivity() {
             val blackBmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
                 .apply { eraseColor(android.graphics.Color.BLACK) }
             wm.setBitmap(blackBmp)
+            // *** Treat black as our “backup state” so we don't prompt on reopen ***
+            prefs.edit()
+            .putInt(KEY_LAST_BACKUP_COLOR, Color.BLACK)
+            .apply()
 
             // 2) Mark as enabled in prefs & Firebase
             prefs.edit().putBoolean("blocking_enabled", true).apply()
@@ -342,7 +348,22 @@ class MainActivity : ComponentActivity() {
 
                 // When restoring, also stamp the time so your receiver ignores it:
                 lastInternalWallpaperChange = System.currentTimeMillis()
+                prefs.edit()
+                .putLong(PREF_LAST_INTERNAL_CHANGE, System.currentTimeMillis())
+                .apply()
                 restoreWallpaper(wm)
+                // *** After restoring, capture *that* wallpaper’s color as the new “backup state” ***
+                @SuppressLint("NewApi")
+                val restoredColor = WallpaperManager
+                .getInstance(this)
+                .getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
+                ?.primaryColor
+                        ?.toArgb()
+                ?: -1
+                prefs.edit()
+                .putInt(KEY_LAST_BACKUP_COLOR, restoredColor)
+                .apply()
+
 
                 // 2) marcar OFF
                 prefs.edit().putBoolean("blocking_enabled", false).apply()
