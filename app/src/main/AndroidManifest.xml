@@ -94,5 +94,12 @@
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED"/>
             </intent-filter>
         </receiver>
+
+        <receiver android:name=".WallpaperChangeReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.WALLPAPER_CHANGED"/>
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

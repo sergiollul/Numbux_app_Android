@@ -66,6 +66,7 @@ import android.app.WallpaperManager.OnColorsChangedListener
 import android.os.Handler
 import android.os.Looper
 import android.app.WallpaperColors
+import android.annotation.SuppressLint
 
 
 
@@ -75,6 +76,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         private const val REQ_OVERLAY = 1001
+        private const val KEY_LAST_BACKUP_COLOR = "last_backup_primary_color"
     }
 
     private lateinit var prefs: SharedPreferences
@@ -95,6 +97,27 @@ class MainActivity : ComponentActivity() {
     private lateinit var showBackupPrompt: MutableState<Boolean>
     private var lastSeenColors: WallpaperColors? = null
 
+    @SuppressLint("NewApi")
+    private fun checkForWallpaperChange() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) return
+
+        val wm = WallpaperManager.getInstance(this)
+        val currColor = wm
+            .getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
+            ?.primaryColor
+            ?.toArgb()
+            ?: -1
+
+        val savedColor = prefs.getInt(KEY_LAST_BACKUP_COLOR, -1)
+        if (savedColor != -1 && currColor != savedColor) {
+            Log.d("MainActivity", "Wallpaper changed: curr=$currColor saved=$savedColor → prompt")
+            showBackupPrompt.value = true
+            prefs.edit()
+                .putBoolean("backup_prompt_pending", true)
+                .apply()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -114,6 +137,11 @@ class MainActivity : ComponentActivity() {
 
         // 3) Initialize SharedPreferences & Compose state
         prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        // set up our backing SharedPreferences and UI state for “backup pending”
+        showBackupPrompt = mutableStateOf(prefs.getBoolean("backup_prompt_pending", false))
+        // then immediately check if the wallpaper changed while we were dead:
+        checkForWallpaperChange()
+
         // ————— First-run initialization —————
         if (!prefs.getBoolean("has_initialized", false)) {
             prefs.edit()
@@ -149,17 +177,6 @@ class MainActivity : ComponentActivity() {
             }
         })
 
-        // 6) Initialize our “haz backup” prompt flag and last-internal-change timestamp
-        showBackupPrompt = mutableStateOf(false)
-        lastInternalWallpaperChange = 0L
-
-        // NEW: grab the initial wallpaper colors so we have a baseline
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            lastSeenColors = WallpaperManager
-            .getInstance(this)
-            .getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
-        }
-
         // 7) Register a listener for any wallpaper change (internal or external)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             val wm = WallpaperManager.getInstance(this)
@@ -168,7 +185,12 @@ class MainActivity : ComponentActivity() {
             wallpaperColorsListener = OnColorsChangedListener { colors, which ->
                 val now = System.currentTimeMillis()
                 if (now - lastInternalWallpaperChange < 2_000) return@OnColorsChangedListener
-                runOnUiThread { showBackupPrompt.value = true }
+                runOnUiThread {
+                    showBackupPrompt.value = true
+                    prefs.edit()
+                    .putBoolean("backup_prompt_pending", true)
+                    .apply()
+                }
             }
 
             wm.addOnColorsChangedListener(wallpaperColorsListener, handler)
@@ -178,7 +200,12 @@ class MainActivity : ComponentActivity() {
                 override fun onReceive(ctx: Context, intent: Intent) {
                     val now = System.currentTimeMillis()
                     if (now - lastInternalWallpaperChange < 2_000) return
-                    runOnUiThread { showBackupPrompt.value = true }
+                    runOnUiThread {
+                        showBackupPrompt.value = true
+                        prefs.edit()
+                        .putBoolean("backup_prompt_pending", true)
+                        .apply()
+                    }
                 }
             }
             registerReceiver(
@@ -210,6 +237,23 @@ class MainActivity : ComponentActivity() {
                     Toast.makeText(context, "Fondo guardado en app.", Toast.LENGTH_SHORT).show()
                     // hide the prompt
                     showBackupPrompt.value = false
+                    prefs.edit().putBoolean("backup_prompt_pending", false).apply()
+                    // also remember this wallpaper’s primary color so we can detect later changes
+                    @SuppressLint("NewApi")
+                    val primaryColor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                        WallpaperManager
+                            .getInstance(context)
+                            .getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
+                            ?.primaryColor   // safe-call
+                            ?.toArgb()       // safe-call
+                            ?: -1            // default when null
+                    } else {
+                        -1
+                    }
+
+                    prefs.edit()
+                        .putInt(KEY_LAST_BACKUP_COLOR, primaryColor)
+                        .apply()
                 }
             }
 
@@ -243,6 +287,25 @@ class MainActivity : ComponentActivity() {
                                     input.copyTo(dst)
                                 }
                                 Toast.makeText(context, "Fondo guardado en app.", Toast.LENGTH_SHORT).show()
+
+                                // hide the “haz backup” prompt permanently
+                                showBackupPrompt.value = false
+                                @SuppressLint("NewApi")
+                                val primaryColor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                                    WallpaperManager
+                                        .getInstance(context)
+                                        .getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
+                                        ?.primaryColor
+                                        ?.toArgb()
+                                        ?: -1
+                                } else {
+                                    -1
+                                }
+
+                                prefs.edit()
+                                    .putBoolean("backup_prompt_pending", false)
+                                    .putInt(KEY_LAST_BACKUP_COLOR, primaryColor)
+                                    .apply()
                             }
                         )
 
@@ -303,20 +366,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
 
-        // NEW: see if the user changed the wallpaper while we were away
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            val wm = WallpaperManager.getInstance(this)
-            val current = wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
-            // if it's really different, and not our own internal flip:
-            if (current != lastSeenColors) {
-                val now = System.currentTimeMillis()
-                if (now - lastInternalWallpaperChange > 2_000) {
-                    showBackupPrompt.value = true
-                }
-                // remember this new state so we don't prompt repeatedly
-                lastSeenColors = current
-            }
-        }
+        checkForWallpaperChange()
 
         if (!isAccessibilityServiceEnabled(this)) {
             if (accessibilityDialog?.isShowing != true) {
