@@ -82,6 +82,8 @@ class MainActivity : ComponentActivity() {
         private const val KEY_LAST_BACKUP_COLOR_LOCK = "last_backup_primary_color_lock"
     }
 
+
+
     private lateinit var prefs: SharedPreferences
     private lateinit var blockingState: MutableState<Boolean>
     private var accessibilityDialog: AlertDialog? = null
@@ -105,50 +107,49 @@ class MainActivity : ComponentActivity() {
     private lateinit var wallpaperColorsListener: WallpaperManager.OnColorsChangedListener
     private var lastInternalWallpaperChange: Long = 0L
     private var lastSeenColors: WallpaperColors? = null
+    private var isInternalWallpaperChange = false
 
     @SuppressLint("NewApi")
     private fun checkForWallpaperChange() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) return
+        if (isInternalWallpaperChange) return
+        if (Build.VERSION.SDK_INT < VERSION_CODES.O_MR1) return
         val now = System.currentTimeMillis()
-        // skip if we ourselves changed it <2s ago
         if (now - lastInternalWallpaperChange < 2_000) return
+
         val wm = WallpaperManager.getInstance(this)
 
-        // check home
-        val currHome = wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
-            ?.primaryColor?.toArgb() ?: -1
+        // 1) fetch current & saved
+        val currHome = wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)?.primaryColor?.toArgb() ?: -1
         val savedHome = prefs.getInt(KEY_LAST_BACKUP_COLOR_HOME, -1)
-        if (savedHome != -1 && currHome != savedHome) {
-            showBackupHomePrompt.value = true
-            prefs.edit().putBoolean("backup_home_prompt", true).apply()
-        }
-
-        // check lock
-        val currLock = wm.getWallpaperColors(WallpaperManager.FLAG_LOCK)
-            ?.primaryColor?.toArgb() ?: -1
+        val currLock = wm.getWallpaperColors(WallpaperManager.FLAG_LOCK)?.primaryColor?.toArgb() ?: -1
         val savedLock = prefs.getInt(KEY_LAST_BACKUP_COLOR_LOCK, -1)
-        if (savedLock != -1 && currLock != savedLock) {
-            showBackupLockPrompt.value = true
-            prefs.edit().putBoolean("backup_lock_prompt", true).apply()
+
+        // 2) did either change?
+        val homeChanged = savedHome != currHome
+        val lockChanged = savedLock != currLock
+
+        if (homeChanged || lockChanged) {
+            // only show the buttons that actually changed
+            showBackupHomePrompt.value = homeChanged
+            showBackupLockPrompt.value = lockChanged
+
+            // persist exactly those flags
+            prefs.edit()
+                .putBoolean("backup_home_prompt", homeChanged)
+                .putBoolean("backup_lock_prompt", lockChanged)
+                .apply()
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 1) Get prefs first
         prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        // hydrate Compose state from prefs
+        showBackupHomePrompt = mutableStateOf(prefs.getBoolean("backup_home_prompt", false))
+        showBackupLockPrompt = mutableStateOf(prefs.getBoolean("backup_lock_prompt", false))
 
-        // 2) Initialize your prompt flags *from* prefs (default false)
-        showBackupHomePrompt = mutableStateOf(
-            prefs.getBoolean("backup_home_prompt", false)
-        )
-        showBackupLockPrompt = mutableStateOf(
-            prefs.getBoolean("backup_lock_prompt", false)
-        )
-
-
-        // 1) Overlay‐permission check (unchanged)…
+        // Overlay permission
         if (!Settings.canDrawOverlays(this)) {
             startActivityForResult(
                 Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")),
@@ -157,45 +158,43 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        // 2) Accessibility-service check
+        // Accessibility service
         if (!isAccessibilityServiceEnabled(this)) {
             showEnableAccessibilityDialog()
         }
 
-        // then immediately check if the wallpaper changed while we were dead:
-        checkForWallpaperChange()
-
-        // ————— First-run initialization —————
-        if (!prefs.getBoolean("has_initialized", false)) {
-            prefs.edit()
+        // First-run initialization
+        val hasInit = prefs.getBoolean("has_initialized", false)
+        if (!hasInit) {
+            // 1) disable blocking by default & mark initialized
+            val editor = prefs.edit()
                 .putBoolean("blocking_enabled", false)
                 .putBoolean("has_initialized", true)
+
+            // 2) snapshot current wallpapers as “last backup”
+            val wm = WallpaperManager.getInstance(this)
+            val homeColor = if (Build.VERSION.SDK_INT >= VERSION_CODES.O_MR1)
+                wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
+                    ?.primaryColor?.toArgb() ?: -1
+            else -1
+            val lockColor = if (Build.VERSION.SDK_INT >= VERSION_CODES.O_MR1)
+                wm.getWallpaperColors(WallpaperManager.FLAG_LOCK)
+                    ?.primaryColor?.toArgb() ?: -1
+            else -1
+            editor.putInt(KEY_LAST_BACKUP_COLOR_HOME, homeColor)
+                .putInt(KEY_LAST_BACKUP_COLOR_LOCK, lockColor)
+
+            // 3) ask for both backups now
+            editor.putBoolean("backup_home_prompt", true)
+                .putBoolean("backup_lock_prompt", true)
                 .apply()
+
+            showBackupHomePrompt.value = true
+            showBackupLockPrompt.value = true
         }
 
-        // First-run: capture whatever the user’s current home & lock wallpapers are,
-// store them as your “last backup” so future changes get detected relative to these,
-// and *ask* for both backups now.
-        val wm = WallpaperManager.getInstance(this)
-        val homeColor = if (Build.VERSION.SDK_INT >= VERSION_CODES.O_MR1)
-            wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
-                ?.primaryColor?.toArgb() ?: -1
-        else -1
-        val lockColor = if (Build.VERSION.SDK_INT >= VERSION_CODES.O_MR1)
-            wm.getWallpaperColors(WallpaperManager.FLAG_LOCK)
-                ?.primaryColor?.toArgb() ?: -1
-        else -1
-
-        prefs.edit()
-            .putInt(KEY_LAST_BACKUP_COLOR_HOME, homeColor)
-            .putInt(KEY_LAST_BACKUP_COLOR_LOCK, lockColor)
-            .putBoolean("backup_home_prompt", true)
-            .putBoolean("backup_lock_prompt", true)
-            .apply()
-
-        // Now that we wrote those flags, mirror them in your Compose state so the buttons show:
-        showBackupHomePrompt.value = true
-        showBackupLockPrompt.value = true
+        // run a one-time catch-up in case the wallpaper changed while the app was dead
+        checkForWallpaperChange()
 
         blockingState = mutableStateOf(prefs.getBoolean("blocking_enabled", false))
 
@@ -235,25 +234,30 @@ class MainActivity : ComponentActivity() {
             val handler = Handler(Looper.getMainLooper())
 
             wallpaperColorsListener = OnColorsChangedListener { colors, which ->
+            if (isInternalWallpaperChange) return@OnColorsChangedListener
             val now = System.currentTimeMillis()
 
             // ignore any change we ourselves just did
             if (now - lastInternalWallpaperChange < 2_000) return@OnColorsChangedListener
                 runOnUiThread {
-                    when (which) {
-                          WallpaperManager.FLAG_SYSTEM -> {
-                                showBackupHomePrompt.value = true
-                                prefs.edit()
-                                  .putBoolean("backup_home_prompt", true)
-                                  .apply()
-                              }
-                          WallpaperManager.FLAG_LOCK -> {
-                                showBackupLockPrompt.value = true
-                                prefs.edit()
-                                  .putBoolean("backup_lock_prompt", true)
-                                  .apply()
-                              }
+                    when(which) {
+                        WallpaperManager.FLAG_SYSTEM -> {
+                            showBackupHomePrompt.value = true
+                            showBackupLockPrompt.value = false
+                            prefs.edit()
+                                .putBoolean("backup_home_prompt", true)
+                                .putBoolean("backup_lock_prompt", false)
+                                .apply()
                         }
+                        WallpaperManager.FLAG_LOCK -> {
+                            showBackupHomePrompt.value = false
+                            showBackupLockPrompt.value = true
+                            prefs.edit()
+                                .putBoolean("backup_home_prompt", false)
+                                .putBoolean("backup_lock_prompt", true)
+                                .apply()
+                        }
+                    }
                 }
             }
 
@@ -419,11 +423,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun enableBlocking(
-        wm: WallpaperManager,
-        writeRemote: Boolean = true
-    ) {
-        // 2) record for your internal-change guard
+    private fun enableBlocking(wm: WallpaperManager, writeRemote: Boolean = true) {
+        // 1) Temporarily stop listening for changes (only on API 27+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            val handler = Handler(Looper.getMainLooper())
+            wm.removeOnColorsChangedListener(wallpaperColorsListener)
+        }
+
+        // 2) record for your internal‐change guard
         lastInternalWallpaperChange = System.currentTimeMillis()
 
         // 3) set black wallpaper
@@ -433,13 +440,24 @@ class MainActivity : ComponentActivity() {
             .apply { eraseColor(android.graphics.Color.BLACK) }
         wm.setBitmap(blackBmp)
 
-        // 4) update prefs
+        // 4) update your “last backup” colors & hide prompts
         prefs.edit()
-
-            .putBoolean("blocking_enabled", true)
+            .putInt(KEY_LAST_BACKUP_COLOR_HOME, Color.BLACK)
+            .putInt(KEY_LAST_BACKUP_COLOR_LOCK, Color.BLACK)
+            .putBoolean("backup_home_prompt", false)
+            .putBoolean("backup_lock_prompt", false)
             .apply()
+        showBackupHomePrompt.value = false
+        showBackupLockPrompt.value = false
 
-        // 5) only write to Firebase if the user tapped the switch locally
+        // 5) Re‐attach the listener (only on API 27+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            val handler = Handler(Looper.getMainLooper())
+            wm.addOnColorsChangedListener(wallpaperColorsListener, handler)
+        }
+
+        // 6) finally write your blocking flag
+        prefs.edit().putBoolean("blocking_enabled", true).apply()
         if (writeRemote) dbRef.setValue(true)
     }
 
@@ -448,26 +466,70 @@ class MainActivity : ComponentActivity() {
         writeRemote: Boolean = true
     ) {
         if (!writeRemote) {
-            // remote-off path
+            // remote‐off path: skip PIN, restore silently
+            isInternalWallpaperChange = true
             lastInternalWallpaperChange = System.currentTimeMillis()
+
             restoreHome(wm)
             restoreLock(wm)
+
+            // read back the actual colors we just restored
+            val newHome = if (Build.VERSION.SDK_INT >= VERSION_CODES.O_MR1)
+                wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
+                    ?.primaryColor?.toArgb() ?: -1
+            else -1
+            val newLock = if (Build.VERSION.SDK_INT >= VERSION_CODES.O_MR1)
+                wm.getWallpaperColors(WallpaperManager.FLAG_LOCK)
+                    ?.primaryColor?.toArgb() ?: -1
+            else -1
+
             prefs.edit()
+                .putInt(KEY_LAST_BACKUP_COLOR_HOME, newHome)
+                .putInt(KEY_LAST_BACKUP_COLOR_LOCK, newLock)
+                .putBoolean("backup_home_prompt", false)
+                .putBoolean("backup_lock_prompt", false)
                 .putBoolean("blocking_enabled", false)
                 .apply()
+
+            showBackupHomePrompt.value = false
+            showBackupLockPrompt.value = false
+
+            isInternalWallpaperChange = false
             return
         }
 
-        // manual-off path: ask for PIN
+        // manual‐off path: ask for PIN
         showDisablePinDialog { success ->
             if (!success) return@showDisablePinDialog
 
+            isInternalWallpaperChange = true
             lastInternalWallpaperChange = System.currentTimeMillis()
+
             restoreHome(wm)
             restoreLock(wm)
+
+            // read back the actual colors we just restored
+            val newHome = if (Build.VERSION.SDK_INT >= VERSION_CODES.O_MR1)
+                wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
+                    ?.primaryColor?.toArgb() ?: -1
+            else -1
+            val newLock = if (Build.VERSION.SDK_INT >= VERSION_CODES.O_MR1)
+                wm.getWallpaperColors(WallpaperManager.FLAG_LOCK)
+                    ?.primaryColor?.toArgb() ?: -1
+            else -1
+
             prefs.edit()
+                .putInt(KEY_LAST_BACKUP_COLOR_HOME, newHome)
+                .putInt(KEY_LAST_BACKUP_COLOR_LOCK, newLock)
+                .putBoolean("backup_home_prompt", false)
+                .putBoolean("backup_lock_prompt", false)
                 .putBoolean("blocking_enabled", false)
                 .apply()
+
+            showBackupHomePrompt.value = false
+            showBackupLockPrompt.value = false
+
+            isInternalWallpaperChange = false
 
             // push change to Firebase
             dbRef.setValue(false)
