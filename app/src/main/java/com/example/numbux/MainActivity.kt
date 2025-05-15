@@ -82,7 +82,6 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var prefs: SharedPreferences
     private lateinit var blockingState: MutableState<Boolean>
-    private lateinit var prefListener: SharedPreferences.OnSharedPreferenceChangeListener
     private var accessibilityDialog: AlertDialog? = null
     // Will hold the bitmap we override, so we can restore it later
     private var previousWallpaper: Bitmap? = null
@@ -148,14 +147,6 @@ class MainActivity : ComponentActivity() {
         }
         blockingState = mutableStateOf(prefs.getBoolean("blocking_enabled", false))
 
-        // 4) Listen for external prefs changes
-        prefListener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-            if (key == "blocking_enabled") {
-                blockingState.value = sp.getBoolean(key, false)
-            }
-        }
-        prefs.registerOnSharedPreferenceChangeListener(prefListener)
-
         // 5) Firebase remote listener (unchanged)
         val room = "testRoom"
         val firebaseUrl = "https://numbux-790d6-default-rtdb.europe-west1.firebasedatabase.app"
@@ -170,14 +161,17 @@ class MainActivity : ComponentActivity() {
 
                 // always apply whatever the DB says, skipping the PIN if remote
                 runOnUiThread {
-                    // 1) immediately update the UI toggle
-                    blockingState.value = remote
-
-                    val wm = WallpaperManager.getInstance(this@MainActivity)
-                    if (remote) enableBlocking(wm, writeRemote = false)
-                    else        disableBlocking(wm, writeRemote = false)
+                    if (blockingState.value != remote) {
+                        // 1) update the UI toggle
+                        blockingState.value = remote
+                        // 2) perform the same enable/disable flow (skipping remote writes)
+                        val wm = WallpaperManager.getInstance(this@MainActivity)
+                        if (remote)      enableBlocking(wm, writeRemote = false)
+                        else             disableBlocking(wm, writeRemote = false)
+                    }
                 }
             }
+
             override fun onCancelled(error: DatabaseError) {
                 Log.w("MainActivity", "Firebase listen failed", error.toException())
             }
@@ -419,9 +413,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleBlockingToggle(isOn: Boolean) {
+        blockingState.value = isOn
         val wm = WallpaperManager.getInstance(this)
         if (isOn) enableBlocking(wm)
-        else      disableBlocking(wm)
+        else disableBlocking(wm)
     }
 
 
@@ -575,6 +570,5 @@ class MainActivity : ComponentActivity() {
         } else {
             unregisterReceiver(wallpaperChangedReceiver)
         }
-        prefs.unregisterOnSharedPreferenceChangeListener(prefListener)
     }
 }
