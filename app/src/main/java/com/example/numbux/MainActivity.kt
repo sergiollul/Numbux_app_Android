@@ -109,6 +109,9 @@ class MainActivity : ComponentActivity() {
     @SuppressLint("NewApi")
     private fun checkForWallpaperChange() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) return
+        val now = System.currentTimeMillis()
+        // skip if we ourselves changed it <2s ago
+        if (now - lastInternalWallpaperChange < 2_000) return
         val wm = WallpaperManager.getInstance(this)
 
         // check home
@@ -232,12 +235,25 @@ class MainActivity : ComponentActivity() {
             val handler = Handler(Looper.getMainLooper())
 
             wallpaperColorsListener = OnColorsChangedListener { colors, which ->
-                val now = System.currentTimeMillis()
-                if (now - lastInternalWallpaperChange < 2_000) return@OnColorsChangedListener
+            val now = System.currentTimeMillis()
+
+            // ignore any change we ourselves just did
+            if (now - lastInternalWallpaperChange < 2_000) return@OnColorsChangedListener
                 runOnUiThread {
-                    prefs.edit()
-                        .putBoolean("backup_prompt_pending", true)
-                        .apply()
+                    when (which) {
+                          WallpaperManager.FLAG_SYSTEM -> {
+                                showBackupHomePrompt.value = true
+                                prefs.edit()
+                                  .putBoolean("backup_home_prompt", true)
+                                  .apply()
+                              }
+                          WallpaperManager.FLAG_LOCK -> {
+                                showBackupLockPrompt.value = true
+                                prefs.edit()
+                                  .putBoolean("backup_lock_prompt", true)
+                                  .apply()
+                              }
+                        }
                 }
             }
 
@@ -346,10 +362,11 @@ class MainActivity : ComponentActivity() {
                         context.contentResolver.openInputStream(it)!!.copyTo(dst)
                     }
                     showBackupLockPrompt.value = false
+                    // Read the *lock*-screen wallpaper color, not the home one:
                     val color = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
                         WallpaperManager
                             .getInstance(context)
-                            .getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
+                            .getWallpaperColors(WallpaperManager.FLAG_LOCK)
                             ?.primaryColor
                             ?.toArgb() ?: -1
                     } else {
@@ -359,6 +376,7 @@ class MainActivity : ComponentActivity() {
                         .putBoolean("backup_lock_prompt", false)
                         .putInt(KEY_LAST_BACKUP_COLOR_LOCK, color)
                         .apply()
+                    showBackupLockPrompt.value = false
                     Toast.makeText(context, "Backup LOCK guardado", Toast.LENGTH_SHORT).show()
                 }
             }
