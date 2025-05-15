@@ -67,6 +67,7 @@ import android.os.Handler
 import android.os.Looper
 import android.app.WallpaperColors
 import android.annotation.SuppressLint
+import android.graphics.BitmapFactory
 
 
 
@@ -424,14 +425,31 @@ class MainActivity : ComponentActivity() {
         // 1) Try the internal file
         val f = File(filesDir, "wallpaper_backup.png")
         if (f.exists()) {
-            FileInputStream(f).use { wm.setStream(it) }
+            // Decode it in‐memory once
+            val bmp = BitmapFactory.decodeFile(f.absolutePath)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                // on Nougat+ you can target system and lock screens in one go
+                wm.setBitmap(
+                    bmp,
+                    /* visibleCrop */    null,
+                    /* allowBackup */    true,
+                    /* which */          WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK
+                )
+            } else {
+                // older devices just do the home screen
+                wm.setBitmap(bmp)
+            }
             return
         }
 
-        // 2) Fallback to the SAF URI
+        // 2) Fallback to the SAF URI if you really need it
         backupWallpaperUri?.let { uri ->
             try {
-                contentResolver.openInputStream(uri)?.use { wm.setStream(it) }
+                // decode the stream into a bitmap, same trick
+                contentResolver.openInputStream(uri)?.use { input ->
+                    val bmp = BitmapFactory.decodeStream(input)
+                    wm.setBitmap(bmp)
+                }
                 return
             } catch (e: Exception) {
                 Log.w("MainActivity", "Failed to restore via SAF URI", e)
