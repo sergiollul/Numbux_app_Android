@@ -15,19 +15,14 @@ import androidx.compose.ui.Alignment
 @Composable
 fun BlockerToggle(
     enabled: Boolean,
-    onToggle: (Boolean, WallpaperManager) -> Unit
+    onToggle: (Boolean) -> Unit
 ) {
-    val ctx = LocalContext.current
-    val wm  = WallpaperManager.getInstance(ctx)
-
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text("Bloqueo de apps")
         Spacer(Modifier.width(8.dp))
         Switch(
-            checked = enabled,
-            onCheckedChange = { isOn ->
-                onToggle(isOn, wm)
-            }
+            checked          = enabled,
+            onCheckedChange = onToggle
         )
     }
 }

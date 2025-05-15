@@ -167,7 +167,16 @@ class MainActivity : ComponentActivity() {
         dbRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val remote = snapshot.getValue(Boolean::class.java) ?: false
-                prefs.edit().putBoolean("blocking_enabled", remote).apply()
+
+                // always apply whatever the DB says, skipping the PIN if remote
+                runOnUiThread {
+                    // 1) immediately update the UI toggle
+                    blockingState.value = remote
+
+                    val wm = WallpaperManager.getInstance(this@MainActivity)
+                    if (remote) enableBlocking(wm, writeRemote = false)
+                    else        disableBlocking(wm, writeRemote = false)
+                }
             }
             override fun onCancelled(error: DatabaseError) {
                 Log.w("MainActivity", "Firebase listen failed", error.toException())
@@ -185,8 +194,8 @@ class MainActivity : ComponentActivity() {
                 runOnUiThread {
                     showBackupPrompt.value = true
                     prefs.edit()
-                    .putBoolean("backup_prompt_pending", true)
-                    .apply()
+                        .putBoolean("backup_prompt_pending", true)
+                        .apply()
                 }
             }
 
@@ -200,8 +209,8 @@ class MainActivity : ComponentActivity() {
                     runOnUiThread {
                         showBackupPrompt.value = true
                         prefs.edit()
-                        .putBoolean("backup_prompt_pending", true)
-                        .apply()
+                            .putBoolean("backup_prompt_pending", true)
+                            .apply()
                     }
                 }
             }
@@ -289,8 +298,8 @@ class MainActivity : ComponentActivity() {
                                 showBackupPrompt.value = false
                                 // record that we just wrote a backup (and implicitly set wallpaper)
                                 prefs.edit()
-                                .putLong(PREF_LAST_INTERNAL_CHANGE, System.currentTimeMillis())
-                                .apply()
+                                    .putLong(PREF_LAST_INTERNAL_CHANGE, System.currentTimeMillis())
+                                    .apply()
 
                                 @SuppressLint("NewApi")
                                 val primaryColor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
@@ -323,66 +332,120 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun handleBlockingToggle(isOn: Boolean, wm: WallpaperManager) {
-        if (isOn) {
-            lastInternalWallpaperChange = System.currentTimeMillis()
-
-            // 1) Create & set a pure-black wallpaper
-            val w = wm.desiredMinimumWidth
-            val h = wm.desiredMinimumHeight
-            val blackBmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-                .apply { eraseColor(android.graphics.Color.BLACK) }
-            wm.setBitmap(blackBmp)
-            // *** Treat black as our “backup state” so we don't prompt on reopen ***
+    private fun enableBlocking(
+        wm: WallpaperManager,
+        writeRemote: Boolean = true
+    ) {
+        // 1) if this came from Firebase, clear any “backup pending” UI
+        if (!writeRemote) {
+            showBackupPrompt.value = false
             prefs.edit()
+                .putBoolean("backup_prompt_pending", false)
+                .apply()
+        }
+
+        // 2) record for your internal-change guard
+        lastInternalWallpaperChange = System.currentTimeMillis()
+
+        // 3) set black wallpaper
+        val w = wm.desiredMinimumWidth
+        val h = wm.desiredMinimumHeight
+        val blackBmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            .apply { eraseColor(android.graphics.Color.BLACK) }
+        wm.setBitmap(blackBmp)
+
+        // 4) update prefs
+        prefs.edit()
             .putInt(KEY_LAST_BACKUP_COLOR, Color.BLACK)
+            .putBoolean("blocking_enabled", true)
             .apply()
 
-            // 2) Mark as enabled in prefs & Firebase
-            prefs.edit().putBoolean("blocking_enabled", true).apply()
-            dbRef.setValue(true)
+        // 5) only write to Firebase if the user tapped the switch locally
+        if (writeRemote) dbRef.setValue(true)
+    }
 
-        } else {
-            showDisablePinDialog { success ->
-                if (!success) return@showDisablePinDialog
-
-                // When restoring, also stamp the time so your receiver ignores it:
-                lastInternalWallpaperChange = System.currentTimeMillis()
-                prefs.edit()
-                .putLong(PREF_LAST_INTERNAL_CHANGE, System.currentTimeMillis())
-                .apply()
-                restoreWallpaper(wm)
-                // *** After restoring, capture *that* wallpaper’s color as the new “backup state” ***
-                @SuppressLint("NewApi")
-                val restoredColor = WallpaperManager
+    private fun disableBlocking(
+        wm: WallpaperManager,
+        writeRemote: Boolean = true
+        ) {
+        // if this came from Firebase, skip the PIN dialog entirely
+        if (!writeRemote) {
+            Log.d("MainActivity", "🔥 remote-off branch invoked")
+            Toast.makeText(this, "Remote OFF → restoring wallpaper", Toast.LENGTH_SHORT).show()
+            // remote “off”: clear any prompt _before_ we restore
+            showBackupPrompt.value = false
+            prefs.edit().putBoolean("backup_prompt_pending", false).apply()
+            lastInternalWallpaperChange = System.currentTimeMillis()
+            restoreWallpaper(wm)
+            @SuppressLint("NewApi")
+            val restoredColor = WallpaperManager
                 .getInstance(this)
                 .getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
                 ?.primaryColor
-                        ?.toArgb()
-                ?: -1
-                prefs.edit()
+                ?.toArgb() ?: -1
+            prefs.edit()
+                .putLong(PREF_LAST_INTERNAL_CHANGE, System.currentTimeMillis())
                 .putInt(KEY_LAST_BACKUP_COLOR, restoredColor)
+                .putBoolean("blocking_enabled", false)
                 .apply()
+            // do not write back to Firebase, since this is already the remote update
+            return
+       }
 
+        // otherwise (user tapped) show PIN dialog as before
+        showDisablePinDialog { success ->
+                if (!success) return@showDisablePinDialog
 
-                // 2) marcar OFF
-                prefs.edit().putBoolean("blocking_enabled", false).apply()
-                dbRef.setValue(false)
+            if (!writeRemote) {
+              // remote “on”: don’t show backup prompt
+              showBackupPrompt.value = false
+             prefs.edit().putBoolean("backup_prompt_pending", false).apply()
             }
+            lastInternalWallpaperChange = System.currentTimeMillis()
+            restoreWallpaper(wm)
+            @SuppressLint("NewApi")
+            val restoredColor = WallpaperManager
+                .getInstance(this)
+                .getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
+                ?.primaryColor
+                ?.toArgb() ?: -1
+            prefs.edit()
+                .putLong(PREF_LAST_INTERNAL_CHANGE, System.currentTimeMillis())
+                .putInt(KEY_LAST_BACKUP_COLOR, restoredColor)
+                .putBoolean("blocking_enabled", false)
+                .apply()
+            if (writeRemote) dbRef.setValue(false)
         }
     }
+
+    private fun handleBlockingToggle(isOn: Boolean) {
+        val wm = WallpaperManager.getInstance(this)
+        if (isOn) enableBlocking(wm)
+        else      disableBlocking(wm)
+    }
+
 
     private fun restoreWallpaper(wm: WallpaperManager) {
+        // 1) Try the internal file
         val f = File(filesDir, "wallpaper_backup.png")
-        if (!f.exists()) {
-            Toast.makeText(this, "No hay backup de fondo", Toast.LENGTH_SHORT).show()
+        if (f.exists()) {
+            FileInputStream(f).use { wm.setStream(it) }
             return
         }
-        FileInputStream(f).use { stream ->
-            wm.setStream(stream)
-        }
-    }
 
+        // 2) Fallback to the SAF URI
+        backupWallpaperUri?.let { uri ->
+            try {
+                contentResolver.openInputStream(uri)?.use { wm.setStream(it) }
+                return
+            } catch (e: Exception) {
+                Log.w("MainActivity", "Failed to restore via SAF URI", e)
+            }
+        }
+
+        // 3) Nothing to load
+        Toast.makeText(this, "No hay backup de fondo", Toast.LENGTH_SHORT).show()
+    }
 
     override fun onResume() {
         super.onResume()
