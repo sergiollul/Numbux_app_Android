@@ -51,7 +51,7 @@ class ControlActivity : ComponentActivity() {
                         // **Write into prefs so your service/UI everywhere picks it up**
                         prefs.edit()
                             .putBoolean("blocking_enabled", newVal)
-                            .commit()   // blocks until the value is written
+                            .apply()
                     }
                     override fun onCancelled(error: DatabaseError) { /* log if desired */ }
                 })
@@ -73,7 +73,15 @@ class ControlActivity : ComponentActivity() {
                         Switch(
                             checked = remoteEnabled,
                             onCheckedChange = { newVal ->
-                                // update remote
+                                // 1) instant UI update
+                                remoteEnabled = newVal
+
+                                // 2) async prefs write
+                                prefs.edit()
+                                    .putBoolean("blocking_enabled", newVal)
+                                    .apply()
+
+                                // 3) async remote write
                                 dbRef.setValue(newVal)
                             }
                         )
