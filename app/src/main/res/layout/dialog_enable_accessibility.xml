@@ -11,6 +11,7 @@
         android:id="@+id/tvDialogTitle"
         style="@style/TextAppearance.Material3.HeadlineSmall"
         android:text="NumbuX sin Permisos"
+        android:textStyle="bold"
         android:textColor="@color/white"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
@@ -22,7 +23,8 @@
         android:layout_marginTop="16dp"
         android:text="Para que NumbuX funcione correctamente, ve a: \n
         \n1. Apps Instaladas → NumbuX\n
-        \n2. ON → Permitir"
+        \n2. ON → Permitir\n
+        \n3. Cierra y vuelve a abrir"
         android:textColor="@color/white"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
