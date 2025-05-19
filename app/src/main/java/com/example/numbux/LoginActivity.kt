@@ -28,18 +28,12 @@ import androidx.compose.animation.core.LinearOutSlowInEasing
 import android.app.AlertDialog
 import android.content.SharedPreferences
 import android.graphics.Color
-import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
-import android.text.Spannable
-import android.text.SpannableString
-import android.text.SpannableStringBuilder
-import android.text.Spanned
-import android.text.style.StyleSpan
-import android.text.style.UnderlineSpan
-import android.widget.TextView
-import android.content.res.ColorStateList
-import android.graphics.drawable.StateListDrawable
-
+import android.annotation.SuppressLint
+import android.view.Gravity
+import android.view.ViewTreeObserver
+import android.widget.Button
+import android.widget.FrameLayout
 
 
 class LoginActivity : ComponentActivity() {
@@ -198,63 +192,68 @@ class LoginActivity : ComponentActivity() {
         )
     }
 
+    @SuppressLint("NewApi")
     private fun showNotificationPermissionDialog() {
-        // 1) Preparamos el título en negrita
-        val titleSpannable = SpannableString("Permisos de Notificación").apply {
-            setSpan(StyleSpan(Typeface.BOLD), 0, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        }
-
-        // 2) Preparamos el mensaje con NumbuX en negrita y "permiso" subrayado
-        val messageBuilder = SpannableStringBuilder().apply {
-            append("Para guiarte por el proceso de instalación, ")
-            val nb = SpannableString("NumbuX")
-            nb.setSpan(StyleSpan(Typeface.BOLD), 0, nb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            append(nb)
-            append(" necesita ")
-            val perm = SpannableString("permiso")
-            perm.setSpan(UnderlineSpan(), 0, perm.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            append(perm)
-            append(" en las notificaciones.\n\nPor favor, acéptalo. 🙂")
-        }
-
-        // 3) Construimos el diálogo
-        val dialog = AlertDialog.Builder(this)
-            .setTitle(titleSpannable)
-            .setMessage(messageBuilder)
-            .setPositiveButton("Vale") { _, _ ->
-                prefs.edit().putBoolean(KEY_NOTIF_DIALOG_SHOWN, true).apply()
-                requestNotificationPermission()
-            }
-            .setCancelable(false)
-            .create()
-
-        dialog.show()
-
-        // fondo del diálogo
-        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.WHITE))
-
-        // botón “Vale” con fondo blanco/negro y texto negro/blanco
-        val positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-        val bgStates = StateListDrawable().apply {
-            addState(intArrayOf(android.R.attr.state_pressed), ColorDrawable(Color.BLACK))
-            addState(intArrayOf(), ColorDrawable(Color.WHITE))
-        }
-        positive.background = bgStates
-        val textStates = ColorStateList(
-            arrayOf(
-                intArrayOf(android.R.attr.state_pressed),
-                intArrayOf()
-            ),
-            intArrayOf(
-                Color.WHITE,
-                Color.BLACK
-            )
+        // 1) Inflate our custom dialog layout
+        val customView = layoutInflater.inflate(
+            R.layout.dialog_enable_notification,
+            null,
+            false
         )
-        positive.setTextColor(textStates)
 
-        // ***forzar texto negro en título y mensaje***
-        val titleId = resources.getIdentifier("alertTitle", "id", "android")
-        (dialog.findViewById<TextView>(titleId))?.setTextColor(Color.BLACK)
-        (dialog.findViewById<TextView>(android.R.id.message))?.setTextColor(Color.BLACK)
+        // 2) Build & show the dialog with our NoShadow style
+        val dlg = AlertDialog.Builder(this, R.style.NoShadowDialog)
+            .setView(customView)
+            .setCancelable(false)
+            .show()
+
+        // 3) Make its background transparent
+        dlg.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+
+        // 4) Wait until the layout has been measured
+        customView.viewTreeObserver.addOnGlobalLayoutListener(object : ViewTreeObserver.OnGlobalLayoutListener {
+            override fun onGlobalLayout() {
+                customView.viewTreeObserver.removeOnGlobalLayoutListener(this)
+
+                val dialogHeightPx = customView.height
+
+                // 5) Create the “Entendido” button entirely in code
+                val btn = Button(this@LoginActivity).apply {
+                    text = "Entendido"
+                    background = ContextCompat.getDrawable(context, R.drawable.button_bg_pressed_selector)
+                    setTextColor(ContextCompat.getColorStateList(context, R.color.button_text_pressed_selector))
+                    val pad = (16 * resources.displayMetrics.density).toInt()
+                    setPadding(pad, pad / 2, pad, pad / 2)
+                    setOnClickListener {
+                       // 1) Dismiss the dialog…
+                       dlg.dismiss()
+
+                       // 2) Remember we showed it so next time we go straight to the system permission
+                       prefs.edit()
+                           .putBoolean(KEY_NOTIF_DIALOG_SHOWN, true)
+                           .apply()
+
+                       // 3) *Now* fire off the real POST_NOTIFICATIONS permission request
+                       requestNotificationPermission()
+                   }
+                }
+
+                // 6) Inject it just below the dialog’s content
+                dlg.window
+                    ?.decorView
+                    ?.findViewById<FrameLayout>(android.R.id.content)
+                    ?.let { container ->
+                        val topMarginPx = dialogHeightPx + (8 * resources.displayMetrics.density).toInt()
+                        val params = FrameLayout.LayoutParams(
+                            FrameLayout.LayoutParams.WRAP_CONTENT,
+                            FrameLayout.LayoutParams.WRAP_CONTENT
+                        ).apply {
+                            gravity = Gravity.CENTER_HORIZONTAL or Gravity.TOP
+                            this.topMargin = topMarginPx
+                        }
+                        container.addView(btn, params)
+                    }
+            }
+        })
     }
 }

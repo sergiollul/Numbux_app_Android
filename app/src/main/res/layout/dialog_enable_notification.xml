@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical"
     android:background="@drawable/dialog_background"
     android:padding="24dp"
@@ -10,7 +11,7 @@
     <TextView
         android:id="@+id/tvDialogTitle"
         style="@style/TextAppearance.Material3.HeadlineSmall"
-        android:text="NumbuX sin Permisos"
+        android:text="Permiso de Notificaciones"
         android:textStyle="bold"
         android:textColor="@color/white"
         android:layout_width="match_parent"
@@ -21,10 +22,7 @@
         android:id="@+id/tvDialogMessage"
         style="@style/TextAppearance.Material3.BodyMedium"
         android:layout_marginTop="16dp"
-        android:text="Para que NumbuX funcione correctamente, ve a: \n
-        \n1. Apps Instaladas → NumbuX\n
-        \n2. ON → Permitir\n
-        \n3. Cierra y vuelve a abrir. 💯"
+        android:text="Para poder guiarte en la instalación, NumbuX necesita permiso de notificaciones.\n\nPor favor, acéptalo 😁"
         android:textColor="@color/white"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>

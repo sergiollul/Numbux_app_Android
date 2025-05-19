@@ -234,11 +234,11 @@ class MainActivity : ComponentActivity() {
             val handler = Handler(Looper.getMainLooper())
 
             wallpaperColorsListener = OnColorsChangedListener { colors, which ->
-            if (isInternalWallpaperChange) return@OnColorsChangedListener
-            val now = System.currentTimeMillis()
+                if (isInternalWallpaperChange) return@OnColorsChangedListener
+                val now = System.currentTimeMillis()
 
-            // ignore any change we ourselves just did
-            if (now - lastInternalWallpaperChange < 2_000) return@OnColorsChangedListener
+                // ignore any change we ourselves just did
+                if (now - lastInternalWallpaperChange < 2_000) return@OnColorsChangedListener
                 runOnUiThread {
                     when(which) {
                         WallpaperManager.FLAG_SYSTEM -> {
@@ -395,19 +395,17 @@ class MainActivity : ComponentActivity() {
                         verticalArrangement = Arrangement.spacedBy(20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("Bienvenido a NumbuX", style = MaterialTheme.typography.headlineSmall)
-
                         // ← persistent “haz backup HOME” button
                         if (showBackupHomePrompt.value) {
                             Button(onClick = { pickHomeLauncher.launch(arrayOf("image/*")) }) {
-                                Text("🔄 Haz backup fondo HOME")
+                                Text("\uD83D\uDDBC Restaurar fondo HOME")
                             }
                         }
 
                         // ← persistent “haz backup LOCK” button
                         if (showBackupLockPrompt.value) {
                             Button(onClick = { pickLockLauncher.launch(arrayOf("image/*")) }) {
-                                Text("🔄 Haz backup fondo LOCK")
+                                Text("\uD83D\uDD12 Restaurar fondo BLOQUEO")
                             }
                         }
 
@@ -556,10 +554,10 @@ class MainActivity : ComponentActivity() {
                     /* visibleCrop= */ null,
                     /* allowBackup= */ true,
                     WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK
-                            )
-                } else {
+                )
+            } else {
                 wm.setBitmap(bmp)
-                }
+            }
             return
         }
 
