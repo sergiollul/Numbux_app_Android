@@ -6,7 +6,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
-import android.text.TextUtils
 import android.util.Log
 import android.widget.EditText
 import android.widget.Toast
@@ -15,23 +14,18 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.preference.PreferenceManager
 import com.example.numbux.accessibility.AppBlockerService
-import com.example.numbux.control.BlockManager
-import com.example.numbux.ui.PinActivity
 import com.example.numbux.ui.theme.NumbuxTheme
-import com.google.firebase.auth.ktx.auth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.core.view.WindowCompat
 import android.content.SharedPreferences
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
@@ -47,19 +41,14 @@ import android.view.ViewTreeObserver
 import android.graphics.drawable.ColorDrawable
 import android.app.WallpaperManager
 import android.graphics.Bitmap
-import android.graphics.drawable.BitmapDrawable
 import androidx.compose.ui.platform.LocalContext
 import com.example.numbux.ui.BlockerToggle
 import android.os.Build
 import android.os.Build.VERSION_CODES
-import com.example.numbux.ui.RestoreWallpaperButton
 import com.google.firebase.database.DatabaseReference
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.result.contract.ActivityResultContracts.OpenDocument
-import androidx.activity.compose.rememberLauncherForActivityResult
 import java.io.File
-import java.io.FileInputStream
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
 import android.app.WallpaperManager.OnColorsChangedListener
@@ -68,8 +57,6 @@ import android.os.Looper
 import android.app.WallpaperColors
 import android.annotation.SuppressLint
 import android.graphics.BitmapFactory
-
-
 
 
 @OptIn(ExperimentalMaterial3Api::class)
