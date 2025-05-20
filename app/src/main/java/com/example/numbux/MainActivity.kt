@@ -132,6 +132,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        val wallpaperManager: WallpaperManager =
+            getSystemService(WallpaperManager::class.java)
         // hydrate Compose state from prefs
         showBackupHomePrompt = mutableStateOf(prefs.getBoolean("backup_home_prompt", false))
         showBackupLockPrompt = mutableStateOf(prefs.getBoolean("backup_lock_prompt", false))
@@ -397,23 +399,22 @@ class MainActivity : ComponentActivity() {
                         }
 
                         BlockerToggle(
-                            enabled  = blockingState.value,
+                            enabled = blockingState.value,
                             onToggle = { wantsOff ->
                                 if (!wantsOff) {
-                                    // el usuario está intentando pasar a OFF → pedimos PIN
+                                    // 1) El usuario intenta DESACTIVAR → pedimos PIN
                                     showDisablePinDialog { success ->
                                         if (success) {
-                                            // PIN correcto: aplicamos OFF
+                                            // 2a) PIN correcto → aplicamos OFF
                                             blockingState.value = false
-                                            // aquí tu lógica de desactivar bloqueo
+                                            disableBlocking(wm = wallpaperManager)
                                         }
-                                        // PIN cancelado/incorrecto: no hacemos nada
-                                        // el toggle seguirá mostrando ON
+                                        // 2b) Cancelar/incorrecto → no cambiamos nada
                                     }
                                 } else {
-                                    // el usuario activa (ON): aplicamos inmediatamente
+                                    // El usuario activa manualmente (ON)
                                     blockingState.value = true
-                                    // aquí tu lógica de activar bloqueo
+                                    enableBlocking(wm = wallpaperManager)
                                 }
                             }
                         )
