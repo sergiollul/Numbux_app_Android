@@ -396,7 +396,27 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        BlockerToggle(enabled = enabled, onToggle = ::handleBlockingToggle)
+                        BlockerToggle(
+                            enabled  = blockingState.value,
+                            onToggle = { wantsOff ->
+                                if (!wantsOff) {
+                                    // el usuario está intentando pasar a OFF → pedimos PIN
+                                    showDisablePinDialog { success ->
+                                        if (success) {
+                                            // PIN correcto: aplicamos OFF
+                                            blockingState.value = false
+                                            // aquí tu lógica de desactivar bloqueo
+                                        }
+                                        // PIN cancelado/incorrecto: no hacemos nada
+                                        // el toggle seguirá mostrando ON
+                                    }
+                                } else {
+                                    // el usuario activa (ON): aplicamos inmediatamente
+                                    blockingState.value = true
+                                    // aquí tu lógica de activar bloqueo
+                                }
+                            }
+                        )
                         Text(
                             if (enabled) "El bloqueador está ACTIVADO"
                             else "El bloqueador está DESACTIVADO",
@@ -485,7 +505,11 @@ class MainActivity : ComponentActivity() {
 
         // manual‐off path: ask for PIN
         showDisablePinDialog { success ->
-            if (!success) return@showDisablePinDialog
+            if (!success) {
+                // Revert toggle back to ON if PIN cancelled/incorrect
+                blockingState.value = true
+                return@showDisablePinDialog
+            }
 
             isInternalWallpaperChange = true
             lastInternalWallpaperChange = System.currentTimeMillis()
@@ -679,20 +703,27 @@ class MainActivity : ComponentActivity() {
                     android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
             hint = "####"
         }
-        AlertDialog.Builder(this)
+
+        val correctPin = prefs.getString("pin_app_lock", "1234")
+
+        val builder = AlertDialog.Builder(this)
             .setTitle("Ingrese PIN para desactivar")
             .setView(pinInput)
+            .setCancelable(false)
             .setPositiveButton("OK") { _, _ ->
                 val entered = pinInput.text.toString()
-                val correct = prefs.getString("pin_app_lock", "1234")
-                if (entered == correct) onResult(true)
-                else {
+                if (entered == correctPin) {
+                    onResult(true)
+                } else {
                     Toast.makeText(this, "PIN incorrecto", Toast.LENGTH_SHORT).show()
                     onResult(false)
                 }
             }
-            .setNegativeButton("Cancelar") { _, _ -> onResult(false) }
-            .show()
+            .setNegativeButton("Cancelar") { _, _ ->
+                onResult(false)
+            }
+
+        builder.show()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
