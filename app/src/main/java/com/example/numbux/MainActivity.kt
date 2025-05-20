@@ -472,14 +472,14 @@ class MainActivity : ComponentActivity() {
         writeRemote: Boolean = true
     ) {
         if (!writeRemote) {
-            // remote‐off path: skip PIN, restore silently
+            // remote‐off path: skip todo y restaurar silenciosamente
             isInternalWallpaperChange = true
             lastInternalWallpaperChange = System.currentTimeMillis()
 
             restoreHome(wm)
             restoreLock(wm)
 
-            // read back the actual colors we just restored
+            // leemos de nuevo los colores restaurados
             val newHome = if (Build.VERSION.SDK_INT >= VERSION_CODES.O_MR1)
                 wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
                     ?.primaryColor?.toArgb() ?: -1
@@ -504,46 +504,38 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        // manual‐off path: ask for PIN
-        showDisablePinDialog { success ->
-            if (!success) {
-                // Revert toggle back to ON if PIN cancelled/incorrect
-                blockingState.value = true
-                return@showDisablePinDialog
-            }
+        // off‐path normal: restaurar y luego escribir remoto, SIN pedir PIN
+        isInternalWallpaperChange = true
+        lastInternalWallpaperChange = System.currentTimeMillis()
 
-            isInternalWallpaperChange = true
-            lastInternalWallpaperChange = System.currentTimeMillis()
+        restoreHome(wm)
+        restoreLock(wm)
 
-            restoreHome(wm)
-            restoreLock(wm)
+        // leemos de nuevo los colores restaurados
+        val newHome = if (Build.VERSION.SDK_INT >= VERSION_CODES.O_MR1)
+            wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
+                ?.primaryColor?.toArgb() ?: -1
+        else -1
+        val newLock = if (Build.VERSION.SDK_INT >= VERSION_CODES.O_MR1)
+            wm.getWallpaperColors(WallpaperManager.FLAG_LOCK)
+                ?.primaryColor?.toArgb() ?: -1
+        else -1
 
-            // read back the actual colors we just restored
-            val newHome = if (Build.VERSION.SDK_INT >= VERSION_CODES.O_MR1)
-                wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
-                    ?.primaryColor?.toArgb() ?: -1
-            else -1
-            val newLock = if (Build.VERSION.SDK_INT >= VERSION_CODES.O_MR1)
-                wm.getWallpaperColors(WallpaperManager.FLAG_LOCK)
-                    ?.primaryColor?.toArgb() ?: -1
-            else -1
+        prefs.edit()
+            .putInt(KEY_LAST_BACKUP_COLOR_HOME, newHome)
+            .putInt(KEY_LAST_BACKUP_COLOR_LOCK, newLock)
+            .putBoolean("backup_home_prompt", false)
+            .putBoolean("backup_lock_prompt", false)
+            .putBoolean("blocking_enabled", false)
+            .apply()
 
-            prefs.edit()
-                .putInt(KEY_LAST_BACKUP_COLOR_HOME, newHome)
-                .putInt(KEY_LAST_BACKUP_COLOR_LOCK, newLock)
-                .putBoolean("backup_home_prompt", false)
-                .putBoolean("backup_lock_prompt", false)
-                .putBoolean("blocking_enabled", false)
-                .apply()
+        showBackupHomePrompt.value = false
+        showBackupLockPrompt.value = false
 
-            showBackupHomePrompt.value = false
-            showBackupLockPrompt.value = false
+        isInternalWallpaperChange = false
 
-            isInternalWallpaperChange = false
-
-            // push change to Firebase
-            dbRef.setValue(false)
-        }
+        // sólo aquí empujamos el cambio a Firebase
+        dbRef.setValue(false)
     }
 
     private fun handleBlockingToggle(isOn: Boolean) {
