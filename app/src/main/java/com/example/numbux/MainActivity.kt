@@ -392,7 +392,7 @@ class MainActivity : ComponentActivity() {
                 drawerState = drawerState,
                 drawerContent = {
                     ModalDrawerSheet(
-                        drawerContainerColor = androidx.compose.ui.graphics.Color(0xFF000000),
+                        drawerContainerColor = androidx.compose.ui.graphics.Color(0xB3000000),
                         drawerContentColor   = androidx.compose.ui.graphics.Color(0xFFFFFFFF)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
@@ -427,7 +427,7 @@ class MainActivity : ComponentActivity() {
                                         Icon(
                                             imageVector = Icons.Filled.Menu,
                                             contentDescription = "Menú",
-                                            modifier = Modifier.size(36.dp)  // aquí aumentas el tamaño
+                                            modifier = Modifier.size(38.dp)  // aquí aumentas el tamaño
                                         )
                                     }
                                 }
