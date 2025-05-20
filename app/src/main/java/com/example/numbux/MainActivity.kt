@@ -402,7 +402,7 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier
                             .border(
                                 width = 2.dp,
-                                color = androidx.compose.ui.graphics.Color(0xFFFF6300),
+                                color = androidx.compose.ui.graphics.Color(0xCCFF6300),
                                 shape = RoundedCornerShape(16.dp)
                             )
                             .padding(0.dp),
@@ -812,4 +812,3 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
