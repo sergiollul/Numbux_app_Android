@@ -73,6 +73,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.ui.unit.sp
+
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -397,6 +399,7 @@ class MainActivity : ComponentActivity() {
                             Text(
                                 text = "NumbuX",
                                 color = androidx.compose.ui.graphics.Color(0xFFFFFFFF),
+                                fontSize = 24.sp,
                                 modifier = Modifier.padding(vertical = 8.dp)
                             )
                             Text(
@@ -423,7 +426,8 @@ class MainActivity : ComponentActivity() {
                                     }) {
                                         Icon(
                                             imageVector = Icons.Filled.Menu,
-                                            contentDescription = "Menú"
+                                            contentDescription = "Menú",
+                                            modifier = Modifier.size(36.dp)  // aquí aumentas el tamaño
                                         )
                                     }
                                 }
