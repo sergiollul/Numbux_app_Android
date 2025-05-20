@@ -74,9 +74,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.border
 
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
+
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -395,10 +400,15 @@ class MainActivity : ComponentActivity() {
                 drawerContent = {
                     ModalDrawerSheet(
                         modifier = Modifier
-                            .border(width = 2.dp, color = androidx.compose.ui.graphics.Color(0xFFFF6300))  // borde naranja
+                            .border(
+                                width = 2.dp,
+                                color = androidx.compose.ui.graphics.Color(0xFFFF6300),
+                                shape = RoundedCornerShape(16.dp)
+                            )
                             .padding(0.dp),
+                        drawerShape          = RoundedCornerShape(16.dp),
                         drawerContainerColor = androidx.compose.ui.graphics.Color(0xB3000000),
-                        drawerContentColor   = androidx.compose.ui.graphics.Color(0xFFFFFFFF)
+                        drawerContentColor   = androidx.compose.ui.graphics.Color(0xFFFFFFFF),
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
