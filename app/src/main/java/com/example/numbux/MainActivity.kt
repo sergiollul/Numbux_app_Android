@@ -57,6 +57,22 @@ import android.os.Looper
 import android.app.WallpaperColors
 import android.annotation.SuppressLint
 import android.graphics.BitmapFactory
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material3.ModalDrawerSheet
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -274,10 +290,10 @@ class MainActivity : ComponentActivity() {
         // 8) Now set up your Compose UI
         setContent {
             val enabled by blockingState
-
             val context = LocalContext.current
 
-            // SAF picker launcher
+            // --------------- SAF picker launchers ----------------
+
             val pickWallpaperLauncher = rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.OpenDocument()
             ) { uri: Uri? ->
@@ -286,31 +302,22 @@ class MainActivity : ComponentActivity() {
                         it, Intent.FLAG_GRANT_READ_URI_PERMISSION
                     )
                     // persist to prefs + internal file
-
                     val input = context.contentResolver.openInputStream(it)!!
-                    File(context.filesDir, "wallpaper_backup.png").outputStream().use { dst ->
-                        input.copyTo(dst)
-                    }
+                    File(context.filesDir, "wallpaper_backup.png")
+                        .outputStream().use { dst -> input.copyTo(dst) }
                     Toast.makeText(context, "Fondo guardado en app.", Toast.LENGTH_SHORT).show()
-                    // hide the prompt
-
                     prefs.edit().putBoolean("backup_prompt_pending", false).apply()
-                    // also remember this wallpaper’s primary color so we can detect later changes
                     @SuppressLint("NewApi")
                     val primaryColor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
                         WallpaperManager
                             .getInstance(context)
                             .getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
-                            ?.primaryColor   // safe-call
-                            ?.toArgb()       // safe-call
-                            ?: -1            // default when null
+                            ?.primaryColor
+                            ?.toArgb() ?: -1
                     } else {
                         -1
                     }
-
-                    prefs.edit()
-
-                        .apply()
+                    prefs.edit().apply()
                 }
             }
 
@@ -322,9 +329,10 @@ class MainActivity : ComponentActivity() {
                         it, Intent.FLAG_GRANT_READ_URI_PERMISSION
                     )
                     backupHomeUri = it
-                    File(filesDir, "wallpaper_backup_home.png").outputStream().use { dst ->
-                        context.contentResolver.openInputStream(it)!!.copyTo(dst)
-                    }
+                    File(filesDir, "wallpaper_backup_home.png")
+                        .outputStream().use { dst ->
+                            context.contentResolver.openInputStream(it)!!.copyTo(dst)
+                        }
                     showBackupHomePrompt.value = false
                     val color = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
                         WallpaperManager
@@ -351,11 +359,11 @@ class MainActivity : ComponentActivity() {
                         it, Intent.FLAG_GRANT_READ_URI_PERMISSION
                     )
                     backupLockUri = it
-                    File(filesDir, "wallpaper_backup_lock.png").outputStream().use { dst ->
-                        context.contentResolver.openInputStream(it)!!.copyTo(dst)
-                    }
+                    File(filesDir, "wallpaper_backup_lock.png")
+                        .outputStream().use { dst ->
+                            context.contentResolver.openInputStream(it)!!.copyTo(dst)
+                        }
                     showBackupLockPrompt.value = false
-                    // Read the *lock*-screen wallpaper color, not the home one:
                     val color = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
                         WallpaperManager
                             .getInstance(context)
@@ -369,60 +377,104 @@ class MainActivity : ComponentActivity() {
                         .putBoolean("backup_lock_prompt", false)
                         .putInt(KEY_LAST_BACKUP_COLOR_LOCK, color)
                         .apply()
-                    showBackupLockPrompt.value = false
                     Toast.makeText(context, "Backup LOCK guardado", Toast.LENGTH_SHORT).show()
                 }
             }
 
-            NumbuxTheme {
-                Scaffold(topBar = { TopAppBar(title = { Text("NumbuX") }) }) { inner ->
-                    Column(
-                        Modifier
-                            .fillMaxSize()
-                            .padding(inner)
-                            .padding(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+            // --------------- Drawer setup ----------------
+
+            val drawerState = rememberDrawerState(DrawerValue.Closed)
+            val scope = rememberCoroutineScope()
+
+            ModalNavigationDrawer(
+                drawerState = drawerState,
+                drawerContent = {
+                    ModalDrawerSheet(
+                        drawerContainerColor = androidx.compose.ui.graphics.Color(0xFF000000),
+                        drawerContentColor   = androidx.compose.ui.graphics.Color(0xFFFFFFFF)
                     ) {
-                        // ← persistent “haz backup HOME” button
-                        if (showBackupHomePrompt.value) {
-                            Button(onClick = { pickHomeLauncher.launch(arrayOf("image/*")) }) {
-                                Text("\uD83D\uDDBC Restaurar fondo HOME")
-                            }
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = "NumbuX",
+                                color = androidx.compose.ui.graphics.Color(0xFFFFFFFF),
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                            Text(
+                                text = "Opción B",
+                                color = androidx.compose.ui.graphics.Color(0xFFFFFFFF),
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                            // … más items
                         }
-
-                        // ← persistent “haz backup LOCK” button
-                        if (showBackupLockPrompt.value) {
-                            Button(onClick = { pickLockLauncher.launch(arrayOf("image/*")) }) {
-                                Text("\uD83D\uDD12 Restaurar fondo BLOQUEO")
-                            }
-                        }
-
-                        BlockerToggle(
-                            enabled = blockingState.value,
-                            onToggle = { wantsOff ->
-                                if (!wantsOff) {
-                                    // 1) El usuario intenta DESACTIVAR → pedimos PIN
-                                    showDisablePinDialog { success ->
-                                        if (success) {
-                                            // 2a) PIN correcto → aplicamos OFF
-                                            blockingState.value = false
-                                            disableBlocking(wm = wallpaperManager)
+                    }
+                }
+            ) {
+                NumbuxTheme {
+                    Scaffold(
+                        topBar = {
+                            TopAppBar(
+                                title = { Text("NumbuX") },
+                                navigationIcon = {
+                                    IconButton(onClick = {
+                                        scope.launch {
+                                            if (drawerState.isClosed) drawerState.open()
+                                            else drawerState.close()
                                         }
-                                        // 2b) Cancelar/incorrecto → no cambiamos nada
+                                    }) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Menu,
+                                            contentDescription = "Menú"
+                                        )
                                     }
-                                } else {
-                                    // El usuario activa manualmente (ON)
-                                    blockingState.value = true
-                                    enableBlocking(wm = wallpaperManager)
+                                }
+                            )
+                        }
+                    ) { innerPadding ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(innerPadding)
+                                .padding(24.dp),
+                            verticalArrangement = Arrangement.spacedBy(20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            if (showBackupHomePrompt.value) {
+                                Button(onClick = { pickHomeLauncher.launch(arrayOf("image/*")) }) {
+                                    Text("\uD83D\uDDBC Restaurar fondo HOME")
                                 }
                             }
-                        )
-                        Text(
-                            if (enabled) "El bloqueador está ACTIVADO"
-                            else "El bloqueador está DESACTIVADO",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+
+                            if (showBackupLockPrompt.value) {
+                                Button(onClick = { pickLockLauncher.launch(arrayOf("image/*")) }) {
+                                    Text("\uD83D\uDD12 Restaurar fondo BLOQUEO")
+                                }
+                            }
+
+                            BlockerToggle(
+                                enabled = blockingState.value,
+                                onToggle = { wantsOff ->
+                                    if (!wantsOff) {
+                                        showDisablePinDialog { success ->
+                                            if (success) {
+                                                blockingState.value = false
+                                                disableBlocking(wm = wallpaperManager)
+                                            }
+                                        }
+                                    } else {
+                                        blockingState.value = true
+                                        enableBlocking(wm = wallpaperManager)
+                                    }
+                                }
+                            )
+
+                            Text(
+                                text = if (enabled)
+                                    "El bloqueador está ACTIVADO"
+                                else
+                                    "El bloqueador está DESACTIVADO",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
                     }
                 }
             }
@@ -741,3 +793,4 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
