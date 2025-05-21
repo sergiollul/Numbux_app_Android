@@ -20,7 +20,7 @@ fun BlockerToggle(
     onToggle: (Boolean) -> Unit
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("Bloqueo de apps")
+        Text("Modo Foco:")
         Spacer(Modifier.width(8.dp))
         Switch(
             checked = enabled,

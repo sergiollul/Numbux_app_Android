@@ -422,6 +422,22 @@ class MainActivity : ComponentActivity() {
                                 color = androidx.compose.ui.graphics.Color(0xFFFFFFFF),
                                 modifier = Modifier.padding(vertical = 8.dp)
                             )
+                            BlockerToggle(
+                                enabled = blockingState.value,
+                                onToggle = { wantsOff ->
+                                    if (!wantsOff) {
+                                        showDisablePinDialog { success ->
+                                            if (success) {
+                                                blockingState.value = false
+                                                disableBlocking(wm = wallpaperManager)
+                                            }
+                                        }
+                                    } else {
+                                        blockingState.value = true
+                                        enableBlocking(wm = wallpaperManager)
+                                    }
+                                }
+                            )
                             // … más items
                         }
                     }
@@ -468,23 +484,6 @@ class MainActivity : ComponentActivity() {
                                     Text("\uD83D\uDD12 Restaurar fondo BLOQUEO")
                                 }
                             }
-
-                            BlockerToggle(
-                                enabled = blockingState.value,
-                                onToggle = { wantsOff ->
-                                    if (!wantsOff) {
-                                        showDisablePinDialog { success ->
-                                            if (success) {
-                                                blockingState.value = false
-                                                disableBlocking(wm = wallpaperManager)
-                                            }
-                                        }
-                                    } else {
-                                        blockingState.value = true
-                                        enableBlocking(wm = wallpaperManager)
-                                    }
-                                }
-                            )
 
                             Text(
                                 text = if (enabled)
