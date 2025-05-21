@@ -397,6 +397,7 @@ class MainActivity : ComponentActivity() {
                 drawerContent = {
                     ModalDrawerSheet(
                         modifier = Modifier
+                            .fillMaxHeight(0.9f)
                             .border(
                                 width = 2.dp,
                                 color = androidx.compose.ui.graphics.Color(0xCCFF6300),
