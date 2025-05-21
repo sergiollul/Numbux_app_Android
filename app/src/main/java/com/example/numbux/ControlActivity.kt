@@ -69,7 +69,8 @@ class ControlActivity : ComponentActivity() {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Bloqueo de apps")
+                        // Este es el CONTROLLER
+                        Text("Modo Foco")
                         Switch(
                             checked = remoteEnabled,
                             onCheckedChange = { newVal ->

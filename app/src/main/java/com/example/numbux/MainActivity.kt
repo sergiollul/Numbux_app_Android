@@ -417,11 +417,8 @@ class MainActivity : ComponentActivity() {
                                 fontSize = 24.sp,
                                 modifier = Modifier.padding(vertical = 8.dp)
                             )
-                            Text(
-                                text = "Opción B",
-                                color = androidx.compose.ui.graphics.Color(0xFFFFFFFF),
-                                modifier = Modifier.padding(vertical = 8.dp)
-                            )
+                            Spacer(modifier = Modifier.height(24.dp))  // crea espacio extra bajo el Text
+
                             BlockerToggle(
                                 enabled = blockingState.value,
                                 onToggle = { wantsOff ->
@@ -484,14 +481,6 @@ class MainActivity : ComponentActivity() {
                                     Text("\uD83D\uDD12 Restaurar fondo BLOQUEO")
                                 }
                             }
-
-                            Text(
-                                text = if (enabled)
-                                    "El bloqueador está ACTIVADO"
-                                else
-                                    "El bloqueador está DESACTIVADO",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
                         }
                     }
                 }
