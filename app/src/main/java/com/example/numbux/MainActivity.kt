@@ -13,7 +13,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
@@ -65,7 +64,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
@@ -78,32 +76,25 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import android.view.MotionEvent
 import com.example.numbux.ui.BasicCalculator
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
 import androidx.compose.material3.DrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.unit.dp
-import androidx.compose.material.icons.filled.Menu
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
-import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NumbuXAppBar(
     drawerState: DrawerState,
-    scope: CoroutineScope
+    scope: CoroutineScope,
+    enabled: Boolean
 ) {
     // derive tint from whether the drawer is open
     val iconTint by remember {
@@ -131,10 +122,10 @@ fun NumbuXAppBar(
         },
         title = {
             Icon(
-                imageVector = Icons.Filled.Lock,
+                imageVector = if (enabled) Icons.Filled.Lock else Icons.Filled.LockOpen,
                 contentDescription = "Bloqueo",
-                tint = androidx.compose.ui.graphics.Color.White,
-                modifier = Modifier.size(28.dp)
+                tint        = if (enabled) androidx.compose.ui.graphics.Color(0xFFFF6300) else androidx.compose.ui.graphics.Color.White,
+                modifier    = Modifier.size(28.dp)
             )
         },
         actions = {
@@ -514,7 +505,8 @@ class MainActivity : ComponentActivity() {
                         topBar = {
                             NumbuXAppBar(
                                 drawerState = drawerState,
-                                scope       = scope
+                                scope       = scope,
+                                enabled     = blockingState.value
                             )
                         },
                         bottomBar = { BasicCalculator() }
