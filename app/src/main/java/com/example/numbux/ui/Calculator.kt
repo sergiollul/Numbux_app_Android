@@ -8,6 +8,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.LocalContentColor
+
 
 @Composable
 fun BasicCalculator() {
@@ -29,11 +33,11 @@ fun BasicCalculator() {
 
         // Layout de botones idéntico a tu captura:
         val buttons = listOf(
-            listOf("C",  "()", "%",  "÷"),
+            listOf("C",  "( )", "%",  "÷"),
             listOf("7",  "8",  "9",  "×"),
             listOf("4",  "5",  "6",  "−"),
             listOf("1",  "2",  "3",  "+"),
-            listOf("±",  "0",  ".",  "=")
+            listOf("+/-",  "0",  ".",  "=")
         )
 
         buttons.forEach { row ->
@@ -50,13 +54,13 @@ fun BasicCalculator() {
                                     expression = ""
                                     result     = ""
                                 }
-                                "±" -> {
+                                "+/-" -> {
                                     expression = if (expression.startsWith("-"))
                                         expression.drop(1)
                                     else
                                         "-$expression"
                                 }
-                                "()" -> {
+                                "( )" -> {
                                     // Inserta paréntesis balanceados
                                     expression += if (!expression.contains("(")) "(" else ")"
                                 }
@@ -82,8 +86,41 @@ fun BasicCalculator() {
                             }
                         },
                         modifier = Modifier
-                            .weight(1f)      // todos los botones mismo peso
-                            .aspectRatio(1f) // botones cuadrados
+                            .weight(1f)
+                            .aspectRatio(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = when {
+                                label.matches(Regex("\\d")) ||
+                                        label == "." ||
+                                        label == "+/-" ->
+                                    Color(0xFF171719)          // dígitos, punto y +/-
+
+                                label in listOf("÷", "×", "+", "−") ->
+                                    Color(0xFFA6A6A6)         // operaciones
+
+                                label in listOf("C", "( )", "%") ->
+                                    Color(0xFF2D2D2F)        // C, ( ) and %
+
+                                else ->
+                                    MaterialTheme.colorScheme.primaryContainer
+                            },
+                            contentColor = when {
+                                // Dígitos y punto, +/-
+                                label.matches(Regex("\\d")) || label in listOf(".", "+/-") ->
+                                    Color.White
+
+                                // C, ( ), %
+                                label in listOf("C", "( )", "%") ->
+                                    Color.White // o el color que quieras
+
+                                // Operaciones
+                                label in listOf("+", "−", "×", "÷") ->
+                                    Color.Black
+
+                                else ->
+                                    LocalContentColor.current
+                            }
+                        )
                     ) {
                         Text(label, style = MaterialTheme.typography.titleLarge)
                     }
