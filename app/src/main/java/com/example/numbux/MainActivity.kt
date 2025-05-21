@@ -75,12 +75,9 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.border
-
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.unit.dp
+import android.view.MotionEvent
+
 
 
 
@@ -758,24 +755,43 @@ class MainActivity : ComponentActivity() {
 
         val correctPin = prefs.getString("pin_app_lock", "1234")
 
+        // Construir el diálogo
         val builder = AlertDialog.Builder(this)
             .setTitle("Ingrese PIN para desactivar")
             .setView(pinInput)
-            .setCancelable(false)
             .setPositiveButton("OK") { _, _ ->
                 val entered = pinInput.text.toString()
-                if (entered == correctPin) {
-                    onResult(true)
-                } else {
-                    Toast.makeText(this, "PIN incorrecto", Toast.LENGTH_SHORT).show()
-                    onResult(false)
-                }
+                onResult(entered == correctPin)  // tu lógica de validación
             }
             .setNegativeButton("Cancelar") { _, _ ->
                 onResult(false)
             }
+            .setCancelable(false)
 
-        builder.show()
+        // Mostrar el diálogo y capturar la instancia
+        val dialog = builder.show()
+
+        // Feedback de color al pulsar OK
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.let { btn ->
+            btn.setOnTouchListener { _, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> (btn as Button).setTextColor(Color.parseColor("#FF6300"))
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> (btn as Button).setTextColor(Color.WHITE)
+                }
+                false
+            }
+        }
+
+        // Feedback de color al pulsar Cancelar
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.let { btn ->
+            btn.setOnTouchListener { _, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> (btn as Button).setTextColor(Color.parseColor("#FF6300"))
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> (btn as Button).setTextColor(Color.WHITE)
+                }
+                false
+            }
+        }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
