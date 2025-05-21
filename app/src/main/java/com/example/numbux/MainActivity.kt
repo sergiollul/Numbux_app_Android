@@ -78,7 +78,55 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import android.view.MotionEvent
 import com.example.numbux.ui.BasicCalculator
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.DrawerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.filled.Menu
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NumbuXAppBar(
+    drawerState: DrawerState,
+    scope: CoroutineScope
+) {
+    // derive tint from whether the drawer is open
+    val iconTint by remember {
+        derivedStateOf {
+            if (drawerState.isOpen) androidx.compose.ui.graphics.Color(0xFFFF6300)
+            else androidx.compose.ui.graphics.Color(0xFFFFFFFF)
+        }
+    }
+
+    TopAppBar(
+        title = { Text("NumbuX", color = androidx.compose.ui.graphics.Color(0xFFFFFFFF)) },
+        navigationIcon = {
+            IconButton(onClick = {
+                scope.launch {
+                    if (drawerState.isClosed) drawerState.open()
+                    else drawerState.close()
+                }
+            }) {
+                Icon(
+                    imageVector   = Icons.Filled.Menu,
+                    contentDescription = "Menú",
+                    tint          = iconTint,
+                    modifier      = Modifier.size(38.dp)
+                )
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = androidx.compose.ui.graphics.Color.Transparent)
+    )
+}
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -441,29 +489,12 @@ class MainActivity : ComponentActivity() {
                 NumbuxTheme {
                     Scaffold(
                         topBar = {
-                            TopAppBar(
-                                title = { Text("NumbuX") },
-                                navigationIcon = {
-                                    IconButton(onClick = {
-                                        scope.launch {
-                                            if (drawerState.isClosed) drawerState.open()
-                                            else drawerState.close()
-                                        }
-                                    }) {
-                                        Icon(
-                                            imageVector = Icons.Filled.Menu,
-                                            contentDescription = "Menú",
-                                            modifier = Modifier.size(38.dp)  // aquí aumentas el tamaño
-                                        )
-                                    }
-                                }
+                            NumbuXAppBar(
+                                drawerState = drawerState,
+                                scope       = scope
                             )
                         },
-                        bottomBar = {
-                            // Aquí anclas tu calculadora al fondo
-                            BasicCalculator()
-                        }
-                        
+                        bottomBar = { BasicCalculator() }
                     ) { innerPadding ->
                         Column(
                             modifier = Modifier
