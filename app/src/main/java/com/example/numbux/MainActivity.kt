@@ -77,7 +77,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import android.view.MotionEvent
-
+import com.example.numbux.ui.BasicCalculator
 
 
 
@@ -479,6 +479,9 @@ class MainActivity : ComponentActivity() {
                                     Text("\uD83D\uDD12 Restaurar fondo BLOQUEO")
                                 }
                             }
+
+                            // Calculadora
+                            BasicCalculator()
                         }
                     }
                 }
