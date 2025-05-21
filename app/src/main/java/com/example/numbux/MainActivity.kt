@@ -92,6 +92,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.filled.Menu
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material.icons.filled.Lock
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -107,8 +113,7 @@ fun NumbuXAppBar(
         }
     }
 
-    TopAppBar(
-        title = { Text("NumbuX", color = androidx.compose.ui.graphics.Color(0xFFFFFFFF)) },
+    CenterAlignedTopAppBar(
         navigationIcon = {
             IconButton(onClick = {
                 scope.launch {
@@ -117,14 +122,32 @@ fun NumbuXAppBar(
                 }
             }) {
                 Icon(
-                    imageVector   = Icons.Filled.Menu,
+                    imageVector = Icons.Filled.Menu,
                     contentDescription = "Menú",
-                    tint          = iconTint,
-                    modifier      = Modifier.size(38.dp)
+                    tint = iconTint,
+                    modifier = Modifier.size(38.dp)
                 )
             }
         },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = androidx.compose.ui.graphics.Color.Transparent)
+        title = {
+            Icon(
+                imageVector = Icons.Filled.Lock,
+                contentDescription = "Bloqueo",
+                tint = androidx.compose.ui.graphics.Color.White,
+                modifier = Modifier.size(28.dp)
+            )
+        },
+        actions = {
+            Text(
+                text = "NumbuX",
+                color = androidx.compose.ui.graphics.Color.White,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(end = 16.dp)
+            )
+        },
+        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+            containerColor = androidx.compose.ui.graphics.Color.Transparent
+        )
     )
 }
 
