@@ -458,7 +458,12 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             )
+                        },
+                        bottomBar = {
+                            // Aquí anclas tu calculadora al fondo
+                            BasicCalculator()
                         }
+                        
                     ) { innerPadding ->
                         Column(
                             modifier = Modifier
@@ -479,9 +484,6 @@ class MainActivity : ComponentActivity() {
                                     Text("\uD83D\uDD12 Restaurar fondo BLOQUEO")
                                 }
                             }
-
-                            // Calculadora
-                            BasicCalculator()
                         }
                     }
                 }
