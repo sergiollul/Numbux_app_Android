@@ -52,15 +52,25 @@ fun BasicCalculator() {
             modifier = Modifier.fillMaxWidth()
         )
 
-        // Row con el botón “back” alineado a la derecha
+        // ROW SOLO para el botón back, sin padding vertical extra
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
+                .fillMaxWidth(),
             horizontalArrangement = Arrangement.End
         ) {
-            BackButton {
-                if (expression.isNotEmpty()) expression = expression.dropLast(1)
+            IconButton(
+                onClick = { if (expression.isNotEmpty()) expression = expression.dropLast(1) },
+                modifier = Modifier.size(50.dp),  // botón más grande…
+                colors = IconButtonDefaults.iconButtonColors(
+                    containerColor = Color.Transparent,
+                    contentColor   = Color(0xFFFF6300)
+                )
+            ) {
+                Icon(
+                    imageVector        = Icons.Outlined.Backspace,
+                    contentDescription = "Backspace",
+                    modifier           = Modifier.size(28.dp)  // …pero icono interno igual
+                )
             }
         }
 
@@ -261,22 +271,4 @@ private fun precedence(op: Char): Int = when(op) {
     '+','-' -> 1
     '*','/' -> 2
     else    -> 0
-}
-
-@Composable
-fun BackButton(onBack: () -> Unit) {
-    IconButton(
-        onClick = onBack,
-        modifier = Modifier.size(36.dp),
-        colors = IconButtonDefaults.iconButtonColors(
-            containerColor = Color.Transparent,    // nada de fondo
-            contentColor   = Color(0xFFFF6300)     // trazo naranja
-        )
-    ) {
-        Icon(
-            imageVector        = Icons.Outlined.Backspace,
-            contentDescription = "Backspace",
-            modifier           = Modifier.size(24.dp)
-        )
-    }
 }
