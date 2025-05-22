@@ -18,7 +18,20 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.draw.scale
 import androidx.compose.material3.Divider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Backspace
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.outlined.Backspace
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.dp
 
 
 @Composable
@@ -38,6 +51,18 @@ fun BasicCalculator() {
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.fillMaxWidth()
         )
+
+        // Row con el botón “back” alineado a la derecha
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.End
+        ) {
+            BackButton {
+                if (expression.isNotEmpty()) expression = expression.dropLast(1)
+            }
+        }
 
         // Separador con espacio arriba y abajo
         Spacer(modifier = Modifier.height(14.dp))
@@ -236,4 +261,22 @@ private fun precedence(op: Char): Int = when(op) {
     '+','-' -> 1
     '*','/' -> 2
     else    -> 0
+}
+
+@Composable
+fun BackButton(onBack: () -> Unit) {
+    IconButton(
+        onClick = onBack,
+        modifier = Modifier.size(36.dp),
+        colors = IconButtonDefaults.iconButtonColors(
+            containerColor = Color.Transparent,    // nada de fondo
+            contentColor   = Color(0xFFFF6300)     // trazo naranja
+        )
+    ) {
+        Icon(
+            imageVector        = Icons.Outlined.Backspace,
+            contentDescription = "Backspace",
+            modifier           = Modifier.size(24.dp)
+        )
+    }
 }
