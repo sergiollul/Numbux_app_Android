@@ -13,8 +13,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.draw.scale
 
 @Composable
 fun BasicCalculator() {
@@ -50,6 +52,13 @@ fun BasicCalculator() {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 row.forEach { label ->
+                    // create one interactionSource per Button
+                    val interactionSource = remember { MutableInteractionSource() }
+                    // observe pressed state
+                    val isPressed by interactionSource.collectIsPressedAsState()
+                    // animate scale when pressed
+                    val scaleFactor by animateFloatAsState(if (isPressed) 0.6f else 1f)
+
                     Button(
                         onClick = {
                             when (label) {
@@ -88,6 +97,7 @@ fun BasicCalculator() {
                                 }
                             }
                         },
+                        interactionSource = interactionSource,
                         modifier = Modifier
                             .weight(1f)
                             .aspectRatio(1f),
@@ -143,7 +153,8 @@ fun BasicCalculator() {
                             text       = label,
                             fontSize   = fontSize,
                             fontWeight = fontWeight,
-                            fontFamily = MaterialTheme.typography.titleLarge.fontFamily
+                            fontFamily = MaterialTheme.typography.titleLarge.fontFamily,
+                            modifier   = Modifier.scale(scaleFactor)
                         )
                     }
                 }
