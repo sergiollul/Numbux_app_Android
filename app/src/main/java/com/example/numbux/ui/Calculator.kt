@@ -11,7 +11,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.LocalContentColor
-
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 
 @Composable
 fun BasicCalculator() {
@@ -122,7 +125,26 @@ fun BasicCalculator() {
                             }
                         )
                     ) {
-                        Text(label, style = MaterialTheme.typography.titleLarge)
+                        // choose per‐label sizes
+                        val (fontSize, fontWeight) = when (label) {
+                            "+/-" ->    24.sp to FontWeight.Light
+                            "C"   ->    26.sp to FontWeight.Light
+                            "( )" ->    26.sp to FontWeight.Light
+                            "%"   ->    28.sp to FontWeight.Light
+                            "÷"   ->    46.sp to FontWeight.Light
+                            "×"   ->    46.sp to FontWeight.Light
+                            "−"   ->    60.sp to FontWeight.Light
+                            "+"   ->    46.sp to FontWeight.Light
+                            "="   ->    56.sp to FontWeight.Light
+                            else  ->    34.sp to FontWeight.Medium
+                        }
+
+                        Text(
+                            text       = label,
+                            fontSize   = fontSize,
+                            fontWeight = fontWeight,
+                            fontFamily = MaterialTheme.typography.titleLarge.fontFamily
+                        )
                     }
                 }
             }
