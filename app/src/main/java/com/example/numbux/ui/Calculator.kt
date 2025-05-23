@@ -301,6 +301,7 @@ private fun CalculatorDisplay(
     val displayValue = if (result.isNotEmpty()) result else expression
     var showCursor by remember { mutableStateOf(true) }
 
+    // Blink every 500ms
     LaunchedEffect(displayValue) {
         showCursor = true
         while (true) {
@@ -309,32 +310,35 @@ private fun CalculatorDisplay(
         }
     }
 
-    // Use the same text style so cursor matches text height
+    // Base text style & color
     val style = MaterialTheme.typography.headlineMedium.copy(
         color = MaterialTheme.colorScheme.onSurface
     )
-    // Convert the TextUnit’s value to dp
-    val cursorHeight = style.fontSize.value.dp
+    // TextUnit → Dp
+    val baseHeight = style.fontSize.value.dp
+    // Make cursor 1.4× taller
+    val cursorHeight = baseHeight * 1.4f
 
     Row(
         Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.Bottom       // bottom-align both children
     ) {
         Text(
-            text  = if (displayValue.isEmpty()) "0" else displayValue,
+            text = if (displayValue.isEmpty()) "0" else displayValue,
             style = style
         )
         if (showCursor) {
             Spacer(Modifier.width(2.dp))
             Box(
                 Modifier
-                    .width(1.dp)               // very thin line
-                    .height(cursorHeight)      // same height as your text
-                    .background(style.color)   // same color as your text
+                    .width(1.dp)                    // very thin line
+                    .height(cursorHeight)           // taller than the text
+                    .background(style.color)        // same color as your text
             )
         }
     }
 }
+
 
 
 
