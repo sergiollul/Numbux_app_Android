@@ -55,7 +55,8 @@ fun BasicCalculator() {
         // ROW SOLO para el botón back, sin padding vertical extra
         Row(
             modifier = Modifier
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .padding(end = 20.dp),
             horizontalArrangement = Arrangement.End
         ) {
             IconButton(
