@@ -21,17 +21,34 @@ import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Backspace
-
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.outlined.Backspace
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.border
+import androidx.compose.runtime.*
+import kotlinx.coroutines.delay
+
+
+
+
+
 
 
 @Composable
@@ -45,12 +62,8 @@ fun BasicCalculator() {
             .padding(16.dp),
         verticalArrangement = Arrangement.Top
     ) {
-        // Pantalla de cálculo
-        Text(
-            text = if (result.isNotEmpty()) result else expression.ifEmpty { "0" },
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.fillMaxWidth()
-        )
+        // 1) blinking-cursor display
+        CalculatorDisplay(expression, result)
 
         // ROW SOLO para el botón back, sin padding vertical extra
         Row(
@@ -273,3 +286,39 @@ private fun precedence(op: Char): Int = when(op) {
     '*','/' -> 2
     else    -> 0
 }
+
+@Composable
+private fun CalculatorDisplay(
+    expression: String,
+    result: String
+) {
+    val displayValue = if (result.isNotEmpty()) result else expression
+    var showCursor by remember { mutableStateOf(true) }
+
+    LaunchedEffect(displayValue) {
+        // restart blinking on text change
+        showCursor = true
+        while (true) {
+            delay(500)
+            showCursor = !showCursor
+        }
+    }
+
+    Text(
+        text = buildString {
+            append(if (displayValue.isEmpty()) "0" else displayValue)
+            if (showCursor) append("|")
+        },
+        style = MaterialTheme.typography.headlineMedium.copy(
+            color = MaterialTheme.colorScheme.onSurface
+        ),
+        modifier = Modifier.fillMaxWidth()
+    )
+}
+
+
+
+
+
+
+
