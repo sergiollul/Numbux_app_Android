@@ -333,7 +333,7 @@ private fun CalculatorDisplay(
                 Modifier
                     .width(1.dp)                    // very thin line
                     .height(cursorHeight)           // taller than the text
-                    .background(style.color)        // same color as your text
+                    .background(Color(0xFFFF6300).copy(alpha = 0.9f))
             )
         }
     }
