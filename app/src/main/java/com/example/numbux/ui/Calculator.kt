@@ -44,6 +44,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.border
 import androidx.compose.runtime.*
 import kotlinx.coroutines.delay
+import androidx.compose.foundation.background       // ← add this
+import androidx.compose.foundation.layout.*      // Row, Spacer, Box, width, height, fillMaxWidth, etc.
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 
 
 
@@ -296,7 +302,6 @@ private fun CalculatorDisplay(
     var showCursor by remember { mutableStateOf(true) }
 
     LaunchedEffect(displayValue) {
-        // restart blinking on text change
         showCursor = true
         while (true) {
             delay(500)
@@ -304,17 +309,33 @@ private fun CalculatorDisplay(
         }
     }
 
-    Text(
-        text = buildString {
-            append(if (displayValue.isEmpty()) "0" else displayValue)
-            if (showCursor) append("|")
-        },
-        style = MaterialTheme.typography.headlineMedium.copy(
-            color = MaterialTheme.colorScheme.onSurface
-        ),
-        modifier = Modifier.fillMaxWidth()
+    // Use the same text style so cursor matches text height
+    val style = MaterialTheme.typography.headlineMedium.copy(
+        color = MaterialTheme.colorScheme.onSurface
     )
+    // Convert the TextUnit’s value to dp
+    val cursorHeight = style.fontSize.value.dp
+
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text  = if (displayValue.isEmpty()) "0" else displayValue,
+            style = style
+        )
+        if (showCursor) {
+            Spacer(Modifier.width(2.dp))
+            Box(
+                Modifier
+                    .width(1.dp)               // very thin line
+                    .height(cursorHeight)      // same height as your text
+                    .background(style.color)   // same color as your text
+            )
+        }
+    }
 }
+
 
 
 
