@@ -35,6 +35,9 @@ import com.google.firebase.database.ValueEventListener
 import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
 
+import androidx.core.content.ContextCompat        // ← for ContextCompat
+import com.example.numbux.R
+
 
 
 class AppBlockerService : AccessibilityService() {
@@ -126,7 +129,10 @@ class AppBlockerService : AccessibilityService() {
         // 7) Build & add the view just as before
         val wm = getSystemService(WINDOW_SERVICE) as WindowManager
         val overlay = View(this).apply {
-            setBackgroundColor(Color.BLACK)
+            background = ContextCompat.getDrawable(
+                this@AppBlockerService,
+                R.drawable.numbux_wallpaper
+            )
             setOnTouchListener { _, _ -> true }
         }
         val lp = LayoutParams(
