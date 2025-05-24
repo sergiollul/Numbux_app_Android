@@ -25,42 +25,48 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.outlined.Backspace
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.focusable
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.border
 import androidx.compose.runtime.*
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.background       // ← add this
-import androidx.compose.foundation.layout.*      // Row, Spacer, Box, width, height, fillMaxWidth, etc.
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
-
-
-
-
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusTarget
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.foundation.interaction.FocusInteraction
 
 
 
 @Composable
 fun BasicCalculator() {
+
     var expression by remember { mutableStateOf("") }
     var result     by remember { mutableStateOf("") }
+    val textFieldInteraction = remember { MutableInteractionSource() }
+    val focusRequester       = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        // give Compose a moment to lay out…
+        delay(100)
+        focusRequester.requestFocus()
+        textFieldInteraction.tryEmit(FocusInteraction.Focus())
+    }
+
+    // We only need one state now: text + cursor position
+    var fieldValue by remember {
+        mutableStateOf(TextFieldValue(text = "", selection = TextRange(0)))
+    }
 
     Column(
         modifier = Modifier
@@ -68,8 +74,31 @@ fun BasicCalculator() {
             .padding(16.dp),
         verticalArrangement = Arrangement.Top
     ) {
-        // 1) blinking-cursor display
-        CalculatorDisplay(expression, result)
+        // 1) tappable, movable‐cursor display
+        BasicTextField(
+                    value             = fieldValue,
+                    onValueChange     = { fieldValue = it },
+                    interactionSource = textFieldInteraction,
+                    cursorBrush       = SolidColor(Color(0xFFFF6300)),
+                    textStyle         = MaterialTheme.typography.headlineMedium.copy(
+                                              color     = MaterialTheme.colorScheme.onSurface,
+                                              textAlign = TextAlign.End
+                                                    ),
+            modifier = Modifier
+                           .fillMaxWidth()
+                           .height(IntrinsicSize.Min)
+                           .focusable(interactionSource = textFieldInteraction)
+                           .focusRequester(focusRequester),
+                    decorationBox = { inner ->
+                        Box(
+                                      modifier = Modifier.fillMaxWidth(),
+                                      contentAlignment = Alignment.CenterEnd     // ← push both text & caret to the right
+                                            ) {
+                                      inner()
+                                    }
+                        }
+                        )
+
 
         // ROW SOLO para el botón back, sin padding vertical extra
         Row(
@@ -79,7 +108,13 @@ fun BasicCalculator() {
             horizontalArrangement = Arrangement.End
         ) {
             IconButton(
-                onClick = { if (expression.isNotEmpty()) expression = expression.dropLast(1) },
+                                onClick = {
+                                      val pos = fieldValue.selection.start
+                                      if (pos > 0) {
+                                            val newText = fieldValue.text.removeRange(pos - 1, pos)
+                                            fieldValue = TextFieldValue(newText, TextRange(pos - 1))
+                                          }
+                                    },
                 modifier = Modifier.size(50.dp),  // botón más grande…
                 colors = IconButtonDefaults.iconButtonColors(
                     containerColor = Color.Transparent,
@@ -137,32 +172,61 @@ fun BasicCalculator() {
                             onClick = {
                                 when (label) {
                                     "C" -> {
-                                        expression = ""
-                                        result     = ""
-                                    }
-                                    "+/-" -> {
-                                        expression = if (expression.startsWith("-"))
-                                            expression.drop(1)
-                                        else
-                                            "-$expression"
+                                        // Clear everything and reset caret
+                                        fieldValue = TextFieldValue("", TextRange(0))
                                     }
                                     "( )" -> {
-                                        expression += if (!expression.contains("(")) "(" else ")"
+                                        // Toggle parentheses: if no “(” yet, insert “(” at cursor; else insert “)”
+                                        val text = fieldValue.text
+                                        val sel  = fieldValue.selection.start
+                                        val toInsert = if (!text.contains("(")) "(" else ")"
+                                        val newText = buildString {
+                                            append(text.take(sel))
+                                            append(toInsert)
+                                            append(text.drop(sel))
+                                        }
+                                        fieldValue = TextFieldValue(newText, TextRange(sel + 1))
+                                    }
+                                    "+/-" -> {
+                                        // Toggle sign of the whole expression
+                                        val text = fieldValue.text
+                                        val sel  = fieldValue.selection.start
+                                        if (text.startsWith("-")) {
+                                            // remove leading “-”
+                                            val newText = text.removePrefix("-")
+                                            // move caret back by 1 (but not below 0)
+                                            val newSel = (sel - 1).coerceAtLeast(0)
+                                            fieldValue = TextFieldValue(newText, TextRange(newSel))
+                                        } else {
+                                            // add leading “-”
+                                            val newText = "-$text"
+                                            // move caret forward by 1
+                                            fieldValue = TextFieldValue(newText, TextRange(sel + 1))
+                                        }
                                     }
                                     "=" -> {
-                                        val toEval = expression
+                                        val expr = fieldValue.text
                                             .replace("×", "*")
                                             .replace("÷", "/")
                                             .replace("−", "-")
-                                        result = evaluateExpression(toEval)
-                                        expression = ""
+                                        val res = evaluateExpression(expr)
+                                        fieldValue = TextFieldValue(res, TextRange(res.length))
                                     }
                                     else -> {
+                                        // here’s the corrected nested if/else:
                                         if (result.isNotEmpty() && label.matches(Regex("[0-9.]"))) {
-                                            expression = label
+                                            // start a new number after a result
+                                            fieldValue = TextFieldValue(label, TextRange(1))
                                             result     = ""
                                         } else {
-                                            expression += label
+                                            // insert at the current cursor position
+                                            val sel     = fieldValue.selection.start
+                                            val newText = buildString {
+                                                append(fieldValue.text.take(sel))
+                                                append(label)
+                                                append(fieldValue.text.drop(sel))
+                                            }
+                                            fieldValue = TextFieldValue(newText, TextRange(sel + label.length))
                                         }
                                     }
                                 }
@@ -338,12 +402,3 @@ private fun CalculatorDisplay(
         }
     }
 }
-
-
-
-
-
-
-
-
-
