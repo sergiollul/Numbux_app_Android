@@ -45,13 +45,14 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.foundation.interaction.FocusInteraction
-
+import androidx.compose.ui.focus.onFocusChanged
 
 
 @Composable
 fun BasicCalculator() {
 
     var result     by remember { mutableStateOf("") }
+    val keyboardController = LocalSoftwareKeyboardController.current
     val textFieldInteraction = remember { MutableInteractionSource() }
     val focusRequester       = remember { FocusRequester() }
 
@@ -59,6 +60,9 @@ fun BasicCalculator() {
         // give Compose a moment to lay out…
         delay(100)
         focusRequester.requestFocus()
+        // hide the keyboard right after focus
+        keyboardController?.hide()
+        // also emit a focus interaction so your blinking caret begins
         textFieldInteraction.tryEmit(FocusInteraction.Focus())
     }
 
@@ -77,7 +81,10 @@ fun BasicCalculator() {
         BasicTextField(
             value             = fieldValue,
             onValueChange     = { fieldValue = it },
+<<<<<<< HEAD
             readOnly          = true,
+=======
+>>>>>>> e407eb7e6c694a8ec9b161b2aa5a20d958b17171
             interactionSource = textFieldInteraction,
             cursorBrush       = SolidColor(Color(0xFFFF6300)),
             textStyle         = MaterialTheme.typography.headlineMedium.copy(
@@ -87,8 +94,18 @@ fun BasicCalculator() {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(IntrinsicSize.Min)
+<<<<<<< HEAD
                 .focusable(interactionSource = textFieldInteraction)
                 .focusRequester(focusRequester),
+=======
+                .focusRequester(focusRequester)
+                .focusable(interactionSource = textFieldInteraction)
+                .onFocusChanged { state ->
+                    if (state.isFocused) {
+                        keyboardController?.hide()
+                    }
+                },
+>>>>>>> e407eb7e6c694a8ec9b161b2aa5a20d958b17171
             decorationBox = { inner ->
                 Box(
                     modifier = Modifier.fillMaxWidth(),
