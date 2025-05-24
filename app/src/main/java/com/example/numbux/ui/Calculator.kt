@@ -51,7 +51,6 @@ import androidx.compose.foundation.interaction.FocusInteraction
 @Composable
 fun BasicCalculator() {
 
-    var expression by remember { mutableStateOf("") }
     var result     by remember { mutableStateOf("") }
     val textFieldInteraction = remember { MutableInteractionSource() }
     val focusRequester       = remember { FocusRequester() }
@@ -76,28 +75,29 @@ fun BasicCalculator() {
     ) {
         // 1) tappable, movable‐cursor display
         BasicTextField(
-                    value             = fieldValue,
-                    onValueChange     = { fieldValue = it },
-                    interactionSource = textFieldInteraction,
-                    cursorBrush       = SolidColor(Color(0xFFFF6300)),
-                    textStyle         = MaterialTheme.typography.headlineMedium.copy(
-                                              color     = MaterialTheme.colorScheme.onSurface,
-                                              textAlign = TextAlign.End
-                                                    ),
+            value             = fieldValue,
+            onValueChange     = { fieldValue = it },
+            readOnly          = true,
+            interactionSource = textFieldInteraction,
+            cursorBrush       = SolidColor(Color(0xFFFF6300)),
+            textStyle         = MaterialTheme.typography.headlineMedium.copy(
+                color     = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.End
+            ),
             modifier = Modifier
-                           .fillMaxWidth()
-                           .height(IntrinsicSize.Min)
-                           .focusable(interactionSource = textFieldInteraction)
-                           .focusRequester(focusRequester),
-                    decorationBox = { inner ->
-                        Box(
-                                      modifier = Modifier.fillMaxWidth(),
-                                      contentAlignment = Alignment.CenterEnd     // ← push both text & caret to the right
-                                            ) {
-                                      inner()
-                                    }
-                        }
-                        )
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min)
+                .focusable(interactionSource = textFieldInteraction)
+                .focusRequester(focusRequester),
+            decorationBox = { inner ->
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.CenterEnd     // ← push both text & caret to the right
+                ) {
+                    inner()
+                }
+            }
+        )
 
 
         // ROW SOLO para el botón back, sin padding vertical extra
@@ -108,13 +108,13 @@ fun BasicCalculator() {
             horizontalArrangement = Arrangement.End
         ) {
             IconButton(
-                                onClick = {
-                                      val pos = fieldValue.selection.start
-                                      if (pos > 0) {
-                                            val newText = fieldValue.text.removeRange(pos - 1, pos)
-                                            fieldValue = TextFieldValue(newText, TextRange(pos - 1))
-                                          }
-                                    },
+                onClick = {
+                    val pos = fieldValue.selection.start
+                    if (pos > 0) {
+                        val newText = fieldValue.text.removeRange(pos - 1, pos)
+                        fieldValue = TextFieldValue(newText, TextRange(pos - 1))
+                    }
+                },
                 modifier = Modifier.size(50.dp),  // botón más grande…
                 colors = IconButtonDefaults.iconButtonColors(
                     containerColor = Color.Transparent,
@@ -355,50 +355,4 @@ private fun precedence(op: Char): Int = when(op) {
     '+','-' -> 1
     '*','/' -> 2
     else    -> 0
-}
-
-@Composable
-private fun CalculatorDisplay(
-    expression: String,
-    result: String
-) {
-    val displayValue = if (result.isNotEmpty()) result else expression
-    var showCursor by remember { mutableStateOf(true) }
-
-    // Blink every 500ms
-    LaunchedEffect(displayValue) {
-        showCursor = true
-        while (true) {
-            delay(500)
-            showCursor = !showCursor
-        }
-    }
-
-    // Base text style & color
-    val style = MaterialTheme.typography.headlineMedium.copy(
-        color = MaterialTheme.colorScheme.onSurface
-    )
-    // TextUnit → Dp
-    val baseHeight = style.fontSize.value.dp
-    // Make cursor 1.4× taller
-    val cursorHeight = baseHeight * 1.4f
-
-    Row(
-        Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Bottom       // bottom-align both children
-    ) {
-        Text(
-            text = if (displayValue.isEmpty()) "0" else displayValue,
-            style = style
-        )
-        if (showCursor) {
-            Spacer(Modifier.width(2.dp))
-            Box(
-                Modifier
-                    .width(1.dp)                    // very thin line
-                    .height(cursorHeight)           // taller than the text
-                    .background(Color(0xFFFF6300).copy(alpha = 0.9f))
-            )
-        }
-    }
 }
