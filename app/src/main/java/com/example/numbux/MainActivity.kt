@@ -87,7 +87,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
-
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -129,11 +130,12 @@ fun NumbuXAppBar(
             )
         },
         actions = {
-            Text(
-                text = "NumbuX",
-                color = androidx.compose.ui.graphics.Color.White,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(end = 16.dp)
+            Image(
+                painter = painterResource(id = R.drawable.logo_blanco_numbux),
+                contentDescription = "App logo",
+                modifier = Modifier
+                    .size(100.dp)           // adjust to fit your bar height
+                    .padding(end = 16.dp)
             )
         },
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -473,11 +475,11 @@ class MainActivity : ComponentActivity() {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
                                 text = "NumbuX",
-                                color = androidx.compose.ui.graphics.Color(0xFFFFFFFF),
-                                fontSize = 24.sp,
+                                color = androidx.compose.ui.graphics.Color(0xFFFF6300),
+                                fontSize = 20.sp,
                                 modifier = Modifier.padding(vertical = 8.dp)
                             )
-                            Spacer(modifier = Modifier.height(24.dp))  // crea espacio extra bajo el Text
+                            Spacer(modifier = Modifier.height(24.dp))  // crea espacio extra bajo el logo
 
                             BlockerToggle(
                                 enabled = blockingState.value,
