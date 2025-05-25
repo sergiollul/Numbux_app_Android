@@ -112,8 +112,10 @@ fun NumbuXAppBar(
                 scope.launch {
                     if (drawerState.isClosed) drawerState.open()
                     else drawerState.close()
-                }
-            }) {
+                } },
+                modifier = Modifier
+                    .padding(start = 18.dp)
+            ) {
                 Icon(
                     imageVector = Icons.Filled.Menu,
                     contentDescription = "Menú",
