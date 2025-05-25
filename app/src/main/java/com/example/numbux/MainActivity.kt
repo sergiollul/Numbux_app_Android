@@ -540,24 +540,39 @@ class MainActivity : ComponentActivity() {
     private fun enableBlocking(wm: WallpaperManager, writeRemote: Boolean = true) {
         // 1) Temporarily stop listening for changes (only on API 27+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            val handler = Handler(Looper.getMainLooper())
             wm.removeOnColorsChangedListener(wallpaperColorsListener)
         }
 
         // 2) record for your internal‐change guard
         lastInternalWallpaperChange = System.currentTimeMillis()
 
-        // 3) set black wallpaper
-        val w = wm.desiredMinimumWidth
-        val h = wm.desiredMinimumHeight
-        val blackBmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-            .apply { eraseColor(android.graphics.Color.BLACK) }
-        wm.setBitmap(blackBmp)
+        // 3) load your custom wallpaper instead of a black screen
+        val wallpaperBmp = BitmapFactory.decodeResource(
+            resources,
+            R.drawable.numbux_wallpaper
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            // set for both home and lock
+            wm.setBitmap(
+                wallpaperBmp,
+                /* visibleCrop= */ null,
+                /* allowBackup= */ true,
+                WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK
+            )
+        } else {
+            wm.setBitmap(wallpaperBmp)
+        }
 
         // 4) update your “last backup” colors & hide prompts
+        //    (we assume your image has valid colors you want to treat as “backup”)
+        val primary = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
+                ?.primaryColor?.toArgb() ?: Color.BLACK
+        } else Color.BLACK
+
         prefs.edit()
-            .putInt(KEY_LAST_BACKUP_COLOR_HOME, Color.BLACK)
-            .putInt(KEY_LAST_BACKUP_COLOR_LOCK, Color.BLACK)
+            .putInt(KEY_LAST_BACKUP_COLOR_HOME, primary)
+            .putInt(KEY_LAST_BACKUP_COLOR_LOCK, primary)
             .putBoolean("backup_home_prompt", false)
             .putBoolean("backup_lock_prompt", false)
             .apply()
@@ -566,8 +581,7 @@ class MainActivity : ComponentActivity() {
 
         // 5) Re‐attach the listener (only on API 27+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            val handler = Handler(Looper.getMainLooper())
-            wm.addOnColorsChangedListener(wallpaperColorsListener, handler)
+            wm.addOnColorsChangedListener(wallpaperColorsListener, Handler(Looper.getMainLooper()))
         }
 
         // 6) finally write your blocking flag
