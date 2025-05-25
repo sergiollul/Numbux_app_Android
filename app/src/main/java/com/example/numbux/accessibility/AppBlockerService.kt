@@ -8,7 +8,6 @@ import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
@@ -19,14 +18,10 @@ import androidx.preference.PreferenceManager
 import com.example.numbux.control.BlockManager
 import com.example.numbux.ui.PinActivity
 import com.example.numbux.utils.getDefaultLauncherPackage
-import android.widget.Toast
-import android.graphics.Color
 
 import android.provider.Settings
-import android.net.Uri
 
 import android.view.Gravity
-import android.util.DisplayMetrics
 import android.view.accessibility.AccessibilityEvent.*
 
 import com.google.firebase.database.DataSnapshot
@@ -131,7 +126,7 @@ class AppBlockerService : AccessibilityService() {
         val overlay = View(this).apply {
             background = ContextCompat.getDrawable(
                 this@AppBlockerService,
-                R.drawable.numbux_wallpaper
+                R.drawable.numbux_wallpaper_multitask
             )
             setOnTouchListener { _, _ -> true }
         }

@@ -549,7 +549,7 @@ class MainActivity : ComponentActivity() {
         // 3) load your custom wallpaper instead of a black screen
         val wallpaperBmp = BitmapFactory.decodeResource(
             resources,
-            R.drawable.numbux_wallpaper
+            R.drawable.numbux_wallpaper_homelock
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             // set for both home and lock
