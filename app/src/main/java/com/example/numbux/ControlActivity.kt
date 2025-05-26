@@ -17,6 +17,9 @@ import com.google.firebase.auth.ktx.auth
 import com.google.firebase.database.*
 import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 class ControlActivity : ComponentActivity() {
@@ -64,29 +67,26 @@ class ControlActivity : ComponentActivity() {
                     contentColor   = MaterialTheme.colorScheme.onBackground,
                     topBar         = { TopAppBar(title = { Text("Numbux Controller") }) }
                 ) { padding ->
-                    // 10 dummy switch states
-                    val dummyStates = remember { List(10) { mutableStateOf(false) } }
+                    val scrollState = rememberScrollState()
+                    // 15 dummy switch states
+                    val dummyStates = remember { List(15) { mutableStateOf(false) } }
 
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(padding)
-                            .padding(24.dp),
+                            .padding(24.dp)
+                            .verticalScroll(scrollState),   // <-- make it scrollable,
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         // Row with two master buttons
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 16.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment   = Alignment.CenterVertically
                         ) {
-                            Button(onClick = {
-                                // turn everything ON
-                                remoteEnabled = true
-                                prefs.edit().putBoolean("blocking_enabled", true).apply()
-                                dbRef.setValue(true)
-                                dummyStates.forEach { it.value = true }
-                            }) {
-                                Text("Turn All On")
-                            }
                             Button(onClick = {
                                 // turn everything OFF
                                 remoteEnabled = false
@@ -94,7 +94,19 @@ class ControlActivity : ComponentActivity() {
                                 dbRef.setValue(false)
                                 dummyStates.forEach { it.value = false }
                             }) {
-                                Text("Turn All Off")
+                                Text("Desactivar")
+                            }
+
+                            Spacer(modifier = Modifier.width(16.dp))
+
+                            Button(onClick = {
+                                // turn everything ON
+                                remoteEnabled = true
+                                prefs.edit().putBoolean("blocking_enabled", true).apply()
+                                dbRef.setValue(true)
+                                dummyStates.forEach { it.value = true }
+                            }) {
+                                Text("Activar")
                             }
                         }
 
@@ -104,7 +116,7 @@ class ControlActivity : ComponentActivity() {
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Modo Foco")
+                            Text("Sergio Sánchez - ES1212")
                             Switch(
                                 checked = remoteEnabled,
                                 onCheckedChange = { newVal ->
@@ -124,7 +136,7 @@ class ControlActivity : ComponentActivity() {
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("Dummy Toggle #${index + 1}")
+                                Text("Alumno - ES12${index + 13}")
                                 Switch(
                                     checked = state.value,
                                     onCheckedChange = { state.value = it }
