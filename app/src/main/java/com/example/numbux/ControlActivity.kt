@@ -20,6 +20,17 @@ import com.google.firebase.ktx.Firebase
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
+import com.example.numbux.R
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.foundation.layout.size
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 class ControlActivity : ComponentActivity() {
@@ -65,7 +76,32 @@ class ControlActivity : ComponentActivity() {
                     // make the scaffold itself transparent…
                     containerColor = androidx.compose.ui.graphics.Color.Transparent,
                     contentColor   = MaterialTheme.colorScheme.onBackground,
-                    topBar         = { TopAppBar(title = { Text("Numbux Controller") }) }
+                    topBar = {
+                        TopAppBar(
+                            // Title stays on the left
+                            title = { Text("Panel del Profesor",
+                                fontSize = 14.sp) },
+
+                            // Logo on the right
+                            actions = {
+                                Image(
+                                    painter           = painterResource(R.drawable.logo_blanco_numbux),
+                                    contentDescription = "Numbux Logo",
+                                    modifier = Modifier
+                                        .size(110.dp)           // adjust to fit your bar height
+                                        .align(Alignment.CenterVertically)
+                                        .padding(end = 6.dp)
+                                )
+                            },
+
+                            // Make the bar itself transparent
+                            colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                                containerColor = Color.Transparent,
+                                titleContentColor  = MaterialTheme.colorScheme.onBackground,
+                                actionIconContentColor = MaterialTheme.colorScheme.onBackground
+                            )
+                        )
+                    }
                 ) { padding ->
                     val scrollState = rememberScrollState()
                     // 15 dummy switch states
