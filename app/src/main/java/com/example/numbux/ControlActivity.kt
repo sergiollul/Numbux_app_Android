@@ -59,33 +59,78 @@ class ControlActivity : ComponentActivity() {
 
             NumbuxTheme {
                 Scaffold(
-                    topBar = { TopAppBar(title = { Text("Numbux Controller") }) }
+                    // make the scaffold itself transparent…
+                    containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                    contentColor   = MaterialTheme.colorScheme.onBackground,
+                    topBar         = { TopAppBar(title = { Text("Numbux Controller") }) }
                 ) { padding ->
-                    Row(
+                    // 10 dummy switch states
+                    val dummyStates = remember { List(10) { mutableStateOf(false) } }
+
+                    Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(padding)
                             .padding(24.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // Este es el CONTROLLER
-                        Text("Modo Foco")
-                        Switch(
-                            checked = remoteEnabled,
-                            onCheckedChange = { newVal ->
-                                // 1) instant UI update
-                                remoteEnabled = newVal
-
-                                // 2) async prefs write
-                                prefs.edit()
-                                    .putBoolean("blocking_enabled", newVal)
-                                    .apply()
-
-                                // 3) async remote write
-                                dbRef.setValue(newVal)
+                        // Row with two master buttons
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Button(onClick = {
+                                // turn everything ON
+                                remoteEnabled = true
+                                prefs.edit().putBoolean("blocking_enabled", true).apply()
+                                dbRef.setValue(true)
+                                dummyStates.forEach { it.value = true }
+                            }) {
+                                Text("Turn All On")
                             }
-                        )
+                            Button(onClick = {
+                                // turn everything OFF
+                                remoteEnabled = false
+                                prefs.edit().putBoolean("blocking_enabled", false).apply()
+                                dbRef.setValue(false)
+                                dummyStates.forEach { it.value = false }
+                            }) {
+                                Text("Turn All Off")
+                            }
+                        }
+
+                        // Original “Modo Foco” switch
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Modo Foco")
+                            Switch(
+                                checked = remoteEnabled,
+                                onCheckedChange = { newVal ->
+                                    remoteEnabled = newVal
+                                    prefs.edit()
+                                        .putBoolean("blocking_enabled", newVal)
+                                        .apply()
+                                    dbRef.setValue(newVal)
+                                }
+                            )
+                        }
+
+                        // 10 dummy toggles
+                        dummyStates.forEachIndexed { index, state ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Dummy Toggle #${index + 1}")
+                                Switch(
+                                    checked = state.value,
+                                    onCheckedChange = { state.value = it }
+                                )
+                            }
+                        }
                     }
                 }
             }
