@@ -16,7 +16,6 @@ import com.example.numbux.R
 import com.example.numbux.control.BlockManager
 import android.app.KeyguardManager
 import android.content.Context
-
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.animateDpAsState
@@ -39,7 +38,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.Color
 
 
 
@@ -174,7 +174,7 @@ class PinActivity : ComponentActivity() {
                         style = MaterialTheme.typography.headlineSmall
                     )
 
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(8.dp))
 
                     OutlinedTextField(
                         value = credential,
@@ -196,10 +196,18 @@ class PinActivity : ComponentActivity() {
 
                     error?.let {
                         Spacer(Modifier.height(8.dp))
-                        Text(text = it, color = MaterialTheme.colorScheme.error)
+                        Text(
+                            text      = it,
+                            modifier  = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp),
+                            color     = Color(0xFFFF6300),                    
+                            style     = MaterialTheme.typography.labelSmall,  // small text
+                            textAlign = TextAlign.Center                      // centered
+                        )
                     }
 
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(18.dp))
 
                     Button(
                         onClick = {
@@ -211,8 +219,18 @@ class PinActivity : ComponentActivity() {
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Entrar")
+                        Text("Desbloquear")
                     }
+
+                    Text(
+                        text = "Si no puedes abrir NumbuX, cierra todas las apps y vuelve a intentarlo.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 90.dp)
+                    )
                 }
             }
         }
