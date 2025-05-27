@@ -114,22 +114,6 @@ class PinActivity : ComponentActivity() {
         }
     }
 
-    override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
-        val pinLayout = findViewById<View>(R.id.pinLayoutRoot)
-        if (pinLayout != null && ev != null) {
-            val rect = Rect()
-            pinLayout.getGlobalVisibleRect(rect)
-            val x = ev.rawX.toInt()
-            val y = ev.rawY.toInt()
-            if (rect.contains(x, y)) {
-                return super.dispatchTouchEvent(ev)
-            }
-            // ignore touches outside
-            return true
-        }
-        return super.dispatchTouchEvent(ev)
-    }
-
     override fun onPause() {
         super.onPause()
         BlockManager.isShowingPin = false
