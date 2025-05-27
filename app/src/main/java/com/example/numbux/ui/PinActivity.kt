@@ -33,6 +33,12 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import com.example.numbux.ui.theme.NumbuxTheme
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
 
 
 
@@ -70,6 +76,10 @@ class PinActivity : ComponentActivity() {
             .getString("pin_app_lock", "1234") ?: "1234"
         correctPin = if (targetPkg in SYSTEM_PACKAGES) SYSTEM_PIN else appLockPin
 
+        // Do not move the logo
+        window.setSoftInputMode(
+            WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
+        )
 
         // 2) Now set Compose content:
                 setContent {
@@ -131,70 +141,82 @@ class PinActivity : ComponentActivity() {
     }
 
     @Composable
-      private fun PinScreen(onSubmit: (String) -> Unit) {
-            var credential by remember { mutableStateOf("") }
-            var error     by remember { mutableStateOf<String?>(null) }
-            // animate padding when ime appears
-            val imePadding = WindowInsets.ime
-              .asPaddingValues()
-              .calculateBottomPadding()
-              .let { it }
-            val animatedBottom by animateDpAsState(targetValue = imePadding)
+    private fun PinScreen(onSubmit: (String) -> Unit) {
+        var credential by remember { mutableStateOf("") }
+        var error by remember { mutableStateOf<String?>(null) }
 
-            Surface(
-                  modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp)
-                            .padding(bottom = animatedBottom)
-                        ) {
-                  Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                              ) {
-                        Text(
-                              "Aplicación Bloqueada",
-                              style = MaterialTheme.typography.headlineSmall
-                                    )
-                        Spacer(Modifier.height(16.dp))
-                        OutlinedTextField(
-                              value = credential,
-                              onValueChange = { new ->
-                                    // only digits allowed
-                                    if (new.all { it.isDigit() }) {
-                                          credential = new
-                                          error = null
-                                        }
-                                  },
-                              label = { Text("PIN de Acceso") },
-                              singleLine = true,
-                              modifier = Modifier.fillMaxWidth(),
-                              keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.NumberPassword,
-                                    imeAction = ImeAction.Done
-                                          ),
-                              visualTransformation = PasswordVisualTransformation()
-                                    )
-                        error?.let {
-                              Spacer(Modifier.height(8.dp))
-                              Text(text = it, color = MaterialTheme.colorScheme.error)
+        Surface(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 24.dp),       // push everything down a bit
+                verticalArrangement = Arrangement.Top,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // ---- LOGO FIXED AT TOP ----
+                Image(
+                    painter = painterResource(id = R.drawable.logo_blanco_numbux),
+                    contentDescription = "Logo Numbux",
+                    modifier = Modifier
+                        .size(230.dp)
+                        .padding(bottom = 6.dp)
+                )
+
+                // ---- STATIC FORM (NO IME ANIMATION) ----
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Aplicación Bloqueada",
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    OutlinedTextField(
+                        value = credential,
+                        onValueChange = { new ->
+                            if (new.all { it.isDigit() }) {
+                                credential = new
+                                error = null
                             }
-                        Spacer(Modifier.height(24.dp))
-                        Button(
-                              onClick = {
-                                    if (credential.isBlank()) {
-                                          error = "Requerido"
-                                        } else {
-                                          onSubmit(credential.trim())
-                                        }
-                                  },
-                              modifier = Modifier.fillMaxWidth()
-                                    ) {
-                              Text("Entrar")
+                        },
+                        label = { Text("PIN de Acceso") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.NumberPassword,
+                            imeAction = ImeAction.Done
+                        ),
+                        visualTransformation = PasswordVisualTransformation()
+                    )
+
+                    error?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Text(text = it, color = MaterialTheme.colorScheme.error)
+                    }
+
+                    Spacer(Modifier.height(24.dp))
+
+                    Button(
+                        onClick = {
+                            if (credential.isBlank()) {
+                                error = "Requerido"
+                            } else {
+                                onSubmit(credential.trim())
                             }
-                      }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Entrar")
+                    }
                 }
-          }
+            }
+        }
+    }
 }
 
 
