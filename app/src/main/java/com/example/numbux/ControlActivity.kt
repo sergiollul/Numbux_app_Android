@@ -30,6 +30,10 @@ import androidx.compose.ui.unit.dp
 import com.example.numbux.R
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.clickable
+
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -70,6 +74,13 @@ class ControlActivity : ComponentActivity() {
                     override fun onCancelled(error: DatabaseError) { /* log if desired */ }
                 })
             }
+
+            // 1) State to control the dialog
+            var showDialog by remember { mutableStateOf(false) }
+            // 2) State to control whether the secret is visible
+            var showSecret by remember { mutableStateOf(false) }
+            // 3) Your “secret” text
+            val secretText = "1234"
 
             NumbuxTheme {
                 Scaffold(
@@ -148,7 +159,9 @@ class ControlActivity : ComponentActivity() {
 
                         // Original “Modo Foco” switch
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showDialog = true },
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -161,6 +174,36 @@ class ControlActivity : ComponentActivity() {
                                         .putBoolean("blocking_enabled", newVal)
                                         .apply()
                                     dbRef.setValue(newVal)
+                                }
+                            )
+                        }
+
+                        // The AlertDialog with masking & toggle button
+                        if (showDialog) {
+                            AlertDialog(
+                                onDismissRequest = { showDialog = false },
+                                title = { Text("PIN para Sergio Sánchez:") },
+                                text = {
+                                    // Show either the masked or real text
+                                    Text(
+                                        text = if (showSecret)
+                                            secretText
+                                        else
+                                            "*".repeat(secretText.length),
+                                        fontSize = 16.sp
+                                    )
+                                },
+                                // Button to close the dialog
+                                confirmButton = {
+                                    TextButton(onClick = { showDialog = false }) {
+                                        Text("Cerrar")
+                                    }
+                                },
+                                // Button to toggle mask/unmask
+                                dismissButton = {
+                                    TextButton(onClick = { showSecret = !showSecret }) {
+                                        Text(if (showSecret) "Ocultar" else "Mostrar")
+                                    }
                                 }
                             )
                         }

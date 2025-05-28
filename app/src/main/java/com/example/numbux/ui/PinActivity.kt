@@ -201,7 +201,7 @@ class PinActivity : ComponentActivity() {
                             modifier  = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 24.dp),
-                            color     = Color(0xFFFF6300),                    
+                            color     = Color(0xFFFF6300),
                             style     = MaterialTheme.typography.labelSmall,  // small text
                             textAlign = TextAlign.Center                      // centered
                         )
