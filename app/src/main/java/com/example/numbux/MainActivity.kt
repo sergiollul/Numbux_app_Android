@@ -92,12 +92,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
-import androidx.compose.ui.unit.dp
-
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.mutableStateOf
+import com.example.numbux.ui.DictionaryBottomBar
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -581,9 +578,18 @@ class MainActivity : ComponentActivity() {
                             )
                         },
                         bottomBar = {
-                            if (currentPage == 1) {
-                                BasicCalculator()
-                            } // else: nothing shows
+                            when (currentPage) {
+                                1 -> {
+                                    BasicCalculator()
+                                }
+                                2 -> {
+                                    // Simple example: show every Latin→Spanish entry
+                                    DictionaryBottomBar()
+                                }
+                                else -> {
+                                    // you can add more pages here
+                                }
+                            }
                         }
                     ) { innerPadding ->
                         Column(
