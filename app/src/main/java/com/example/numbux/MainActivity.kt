@@ -518,6 +518,37 @@ class MainActivity : ComponentActivity() {
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                // Texto de la herramienta actual
+                                when (currentPage) {
+                                    1 -> {
+                                        Text(
+                                            text = "Calculadora",
+                                            fontSize = 16.sp,
+                                            color = androidx.compose.ui.graphics.Color(0xFFFF6300),
+                                            modifier = Modifier.padding(horizontal = 4.dp)
+                                        )
+                                    }
+                                    2 -> {
+                                        Text(
+                                            text = "Diccionario",
+                                            fontSize = 16.sp,
+                                            color = androidx.compose.ui.graphics.Color(0xFFFF6300),
+                                            modifier = Modifier.padding(horizontal = 4.dp)
+                                        )
+                                    }
+                                    else -> {
+                                        // you can add more pages here
+                                    }
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .align(Alignment.CenterHorizontally)
+                                    .padding(bottom = 2.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 IconButton(
                                     onClick = {
                                         // go back to page 1 (or clamp at 1)
