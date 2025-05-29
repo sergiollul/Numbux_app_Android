@@ -501,6 +501,27 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             )
+
+                            // ── Push everything above up ──────────────────────────────────────
+                            Spacer(modifier = Modifier.weight(1f))
+
+                            Row(
+                                modifier = Modifier
+                                    .align(Alignment.CenterHorizontally)
+                                    .padding(bottom = 16.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("<<", fontSize = 18.sp)
+                                Text(
+                                    text = "1",  // TODO: replace with your page state
+                                    fontSize = 18.sp,
+                                    modifier = Modifier.padding(horizontal = 8.dp)
+                                )
+                                Text(">>", fontSize = 18.sp)
+                            }
+
+
                             // … más items
                         }
                     }
