@@ -89,7 +89,10 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
-
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material3.Icon
+import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -508,17 +511,40 @@ class MainActivity : ComponentActivity() {
                             Row(
                                 modifier = Modifier
                                     .align(Alignment.CenterHorizontally)
-                                    .padding(bottom = 16.dp),
+                                    .padding(bottom = 2.dp),
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("<<", fontSize = 18.sp)
+                                Icon(
+                                    imageVector    = Icons.Filled.KeyboardArrowLeft,
+                                    contentDescription = "Previous page",
+                                    modifier       = Modifier.size(46.dp),   // make it bigger
+                                    tint = androidx.compose.ui.graphics.Color(0xFFFF6300)
+                                )
                                 Text(
                                     text = "1",  // TODO: replace with your page state
-                                    fontSize = 18.sp,
-                                    modifier = Modifier.padding(horizontal = 8.dp)
+                                    fontSize = 32.sp,
+                                    modifier = Modifier.padding(horizontal = 4.dp)
                                 )
-                                Text(">>", fontSize = 18.sp)
+                                Icon(
+                                    imageVector    = Icons.Filled.KeyboardArrowRight,
+                                    contentDescription = "Next page",
+                                    modifier       = Modifier.size(46.dp),   // make it bigger
+                                    tint = androidx.compose.ui.graphics.Color(0xFFFF6300)
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .align(Alignment.CenterHorizontally)
+                                    .padding(bottom = 6.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Cambiar Herramienta",
+                                    fontSize = 10.sp,
+                                )
                             }
 
 
