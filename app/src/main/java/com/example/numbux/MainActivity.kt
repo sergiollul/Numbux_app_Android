@@ -94,6 +94,11 @@ import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.ui.unit.dp
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NumbuXAppBar(
@@ -366,6 +371,7 @@ class MainActivity : ComponentActivity() {
 
         // 8) Now set up your Compose UI
         setContent {
+            var currentPage by remember { mutableStateOf(1) }
             val enabled by blockingState
             val context = LocalContext.current
 
@@ -515,23 +521,37 @@ class MainActivity : ComponentActivity() {
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector    = Icons.Filled.KeyboardArrowLeft,
-                                    contentDescription = "Previous page",
-                                    modifier       = Modifier.size(46.dp),   // make it bigger
-                                    tint = androidx.compose.ui.graphics.Color(0xFFFF6300)
-                                )
+                                IconButton(
+                                    onClick = {
+                                        // go back to page 1 (or clamp at 1)
+                                        currentPage = maxOf(1, currentPage - 1)
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector        = Icons.Filled.KeyboardArrowLeft,
+                                        contentDescription = "Previous page",
+                                        modifier           = Modifier.size(46.dp),
+                                        tint               = androidx.compose.ui.graphics.Color(0xFFFF6300)
+                                    )
+                                }
                                 Text(
-                                    text = "1",  // TODO: replace with your page state
+                                    text = "$currentPage",  // current page
                                     fontSize = 32.sp,
                                     modifier = Modifier.padding(horizontal = 4.dp)
                                 )
-                                Icon(
-                                    imageVector    = Icons.Filled.KeyboardArrowRight,
-                                    contentDescription = "Next page",
-                                    modifier       = Modifier.size(46.dp),   // make it bigger
-                                    tint = androidx.compose.ui.graphics.Color(0xFFFF6300)
-                                )
+                                IconButton(
+                                    onClick = {
+                                        // advance to page 2 (or whatever your max is)
+                                        currentPage += 1
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector        = Icons.Filled.KeyboardArrowRight,
+                                        contentDescription = "Next page",
+                                        modifier           = Modifier.size(46.dp),
+                                        tint               = androidx.compose.ui.graphics.Color(0xFFFF6300)
+                                    )
+                                }
                             }
 
                             Row(
@@ -546,8 +566,6 @@ class MainActivity : ComponentActivity() {
                                     fontSize = 10.sp,
                                 )
                             }
-
-
                             // … más items
                         }
                     }
@@ -562,7 +580,11 @@ class MainActivity : ComponentActivity() {
                                 enabled     = blockingState.value
                             )
                         },
-                        bottomBar = { BasicCalculator() }
+                        bottomBar = {
+                            if (currentPage == 1) {
+                                BasicCalculator()
+                            } // else: nothing shows
+                        }
                     ) { innerPadding ->
                         Column(
                             modifier = Modifier
