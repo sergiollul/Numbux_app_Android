@@ -17,6 +17,8 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import java.io.IOException
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 
 object Dictionary {
     private const val FILENAME = "diccionario_latin_espanol.txt"
@@ -54,15 +56,20 @@ object Dictionary {
                                     _pairs.add(latin to spanish)
                                     // 2) build a single AnnotatedString with the pre→ part styled
                                     val styled = buildAnnotatedString {
+                                        // 1) push a code‐style for the "latin" word:
                                         pushStyle(
                                             SpanStyle(
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color(0xFF6200EE)
+                                                fontFamily = FontFamily.Monospace,
+                                                fontWeight  = FontWeight.Normal,
+                                                color       = Color.White,           // letters in white
+                                                background  = Color(0xFF616161)      // dark‐gray background
                                             )
                                         )
-                                        append(latin)    // styled prefix
+                                        append(latin)   // your Latin word
                                         pop()
-                                        append(" → $spanish")  // normal suffix
+
+                                        // 2) then the arrow + Spanish in default style:
+                                        append(" → $spanish")
                                     }
                                     styledEntries.add(styled)
                                 }
