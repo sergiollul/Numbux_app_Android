@@ -24,7 +24,7 @@ object Dictionary {
     private const val FILENAME = "diccionario_latin_espanol.txt"
     private const val PAGE_SIZE = 200
 
-    // raw data pairs
+    // raw data pairs (if you need them)
     private val _pairs = mutableListOf<Pair<String, String>>()
     // already‐styled strings ready for rendering
     val styledEntries = mutableStateListOf<AnnotatedString>()
@@ -36,6 +36,17 @@ object Dictionary {
         loadedPages = 0
     }
 
+    private val codeSpanStyle = SpanStyle(
+        fontFamily = FontFamily.Monospace,
+        fontWeight  = FontWeight.Normal,
+        color       = Color.White,
+        background  = Color(0xFF616161)
+    )
+
+    /**
+     * Loads the next page of entries, styling only those Latin words
+     * that do not contain ". sin" with a code‐style span.
+     */
     fun loadNextPage(context: Context) {
         try {
             context.assets.open(FILENAME)
@@ -47,43 +58,40 @@ object Dictionary {
                         .forEach { line ->
                             val t = line.trim()
                             if (t.isEmpty() || t.startsWith("#")) return@forEach
+
                             val parts = t.split(":", limit = 2)
                             if (parts.size == 2) {
                                 val latin  = parts[0].trim().lowercase()
                                 val spanish = parts[1].trim()
                                 if (latin.isNotEmpty() && spanish.isNotEmpty()) {
-                                    // 1) store the raw pair (if you need it elsewhere)
                                     _pairs.add(latin to spanish)
-                                    // 2) build a single AnnotatedString with the pre→ part styled
-                                    val styled = buildAnnotatedString {
-                                        // 1) push a code‐style for the "latin" word:
-                                        pushStyle(
-                                            SpanStyle(
-                                                fontFamily = FontFamily.Monospace,
-                                                fontWeight  = FontWeight.Normal,
-                                                color       = Color.White,           // letters in white
-                                                background  = Color(0xFF616161)      // dark‐gray background
-                                            )
-                                        )
-                                        append(latin)   // your Latin word
-                                        pop()
 
-                                        // 2) then the arrow + Spanish in default style:
-                                        append(" → $spanish")
+                                    val styled = buildAnnotatedString {
+                                        if (latin.contains(". sin")) {
+                                            // no code styling for this entry
+                                            append("$latin → $spanish")
+                                        } else {
+                                            // apply code‐style to the Latin word
+                                            pushStyle(codeSpanStyle)
+                                            append(latin)
+                                            pop()
+                                            // then arrow + Spanish normally
+                                            append(" → $spanish")
+                                        }
                                     }
+
                                     styledEntries.add(styled)
                                 }
                             }
                         }
                 }
+
             loadedPages++
             Log.i("Dictionary", "Loaded page $loadedPages (total items=${styledEntries.size})")
         } catch (e: IOException) {
             Log.e("Dictionary", "Failed loading $FILENAME", e)
             if (styledEntries.isEmpty()) {
-                styledEntries.add(
-                    AnnotatedString("¡No pude cargar el diccionario!")
-                )
+                styledEntries.add(AnnotatedString("¡No pude cargar el diccionario!"))
             }
         }
     }
