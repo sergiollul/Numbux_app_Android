@@ -4,7 +4,9 @@ package com.example.numbux.ui
 import android.content.Context
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -31,23 +33,22 @@ object Dictionary {
             context.assets.open(filename)
                 .bufferedReader()
                 .useLines { lines ->
-                    val sequence = if (maxLines >= 0) lines.take(maxLines) else lines
-                    sequence.forEach { line ->
+                    val seq = if (maxLines >= 0) lines.take(maxLines) else lines
+                    seq.forEach { line ->
                         val trimmed = line.trim()
                         if (trimmed.isEmpty() || trimmed.startsWith("#")) return@forEach
                         val parts = trimmed.split(":", limit = 2)
                         if (parts.size == 2) {
                             val latin = parts[0].trim().lowercase()
                             val spanish = parts[1].trim()
-                            if (latin.isNotEmpty() && spanish.isNotEmpty()) {
+                            if (latin.isNotEmpty() && spanish.isNotEmpty())
                                 _latinToSpanish[latin] = spanish
-                            }
                         }
                     }
                 }
-            Log.i("Dictionary", "Loaded ${_latinToSpanish.size} entries (maxLines=$maxLines)")
+            Log.i("Dictionary", "Loaded ${_latinToSpanish.size} entries")
         } catch (e: IOException) {
-            Log.e("Dictionary", "Failed to load asset “$filename”", e)
+            Log.e("Dictionary", "Failed to load asset $filename", e)
             _latinToSpanish["error"] = "¡No pude cargar el diccionario!"
         }
     }
@@ -70,14 +71,19 @@ fun DictionaryBottomBar() {
     if (entries.isEmpty()) {
         Text("Cargando diccionario…")
     } else {
-        LazyColumn(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+                // limit the height so the list scrolls within this box:
+                .heightIn(max = 770.dp)
+                .padding(16.dp)
         ) {
-            items(entries) { (latin, spanish) ->
-                Text(text = "$latin → $spanish")
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                items(entries) { (latin, spanish) ->
+                    Text("$latin → $spanish")
+                }
             }
         }
     }
