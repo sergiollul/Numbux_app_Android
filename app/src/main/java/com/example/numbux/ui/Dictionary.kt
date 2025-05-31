@@ -5,7 +5,7 @@ import android.content.Context
 import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.Modifier
@@ -63,8 +63,8 @@ object Dictionary {
                     val start = loadedPages * PAGE_SIZE
                     lines.drop(start)
                         .take(PAGE_SIZE)
-                        .forEach { line ->
-                            val t = line.trim()
+                        .forEach { rawLine ->
+                            val t = rawLine.trim()
                             if (t.isEmpty() || t.startsWith("#")) return@forEach
 
                             val parts = t.split(":", limit = 2)
@@ -122,38 +122,148 @@ object Dictionary {
             isLoading = false
         }
     }
+
+    /**
+     * Searches the entire dictionary asset for any Latin word containing [query].
+     * Returns a list of styled AnnotatedStrings (same styling rules as paging).
+     */
+    fun searchAll(context: Context, query: String): List<AnnotatedString> {
+        val results = mutableListOf<AnnotatedString>()
+        try {
+            context.assets.open(FILENAME)
+                .bufferedReader()
+                .useLines { lines ->
+                    lines.forEach { rawLine ->
+                        val t = rawLine.trim()
+                        if (t.isEmpty() || t.startsWith("#")) return@forEach
+
+                        val parts = t.split(":", limit = 2)
+                        if (parts.size == 2) {
+                            val latinRaw = parts[0].trim()
+                            val latin = latinRaw.lowercase()
+                            val spanish = parts[1].trim()
+                            if (latin.contains(query.lowercase())) {
+                                // Apply same styling logic
+                                val styled = buildAnnotatedString {
+                                    if (latin.contains(". sin")) {
+                                        append("$latin → $spanish")
+                                    } else {
+                                        pushStyle(codeSpanStyle)
+                                        append(latin)
+                                        pop()
+                                        append(" → $spanish")
+                                    }
+                                }
+                                results.add(styled)
+                            }
+                        }
+                    }
+                }
+        } catch (e: IOException) {
+            Log.e("Dictionary", "Search failed for \"$query\"", e)
+        }
+        return results
+    }
 }
 
 @Composable
 fun DictionaryBottomBar() {
     val context = LocalContext.current
 
-    // on first show, reset & load first page
+    // State for the search query
+    var query by remember { mutableStateOf("") }
+    // State to hold search results when user types
+    var searchResults by remember { mutableStateOf<List<AnnotatedString>>(emptyList()) }
+    // Determine if we’re in “search mode”
+    val isSearching = query.trim().isNotEmpty()
+
+    // Initial load of first page, only when not searching
     LaunchedEffect(Unit) {
         Dictionary.reset()
         Dictionary.loadNextPage(context)
     }
 
-    if (Dictionary.styledEntries.isEmpty()) {
-        Text("Cargando diccionario…", modifier = Modifier.padding(16.dp))
-    } else {
-        Box(
+    // Whenever query changes, perform a full-text search
+    LaunchedEffect(query) {
+        if (query.isBlank()) {
+            // Clear search results when query is empty
+            searchResults = emptyList()
+        } else {
+            searchResults = Dictionary.searchAll(context, query.trim())
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            // If this bottom bar lives inside a Scaffold.bottomBar, you might want to limit
+            // its total height. Otherwise, you can let it expand as needed.
+            .fillMaxHeight(0.92f) // for example, use 80% of screen height; adjust as needed
+    ) {
+        // ────────────────
+        // 1️⃣ Search Field (always at top)
+        TextField(
+            value = query,
+            onValueChange = { query = it },
+            placeholder = { Text("Buscar…") },
+            singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 760.dp)
-                .padding(16.dp)
-        ) {
-            val state = rememberLazyListState()
-            LazyColumn(
-                state = state,
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                itemsIndexed(Dictionary.styledEntries) { index, styledText ->
-                    Text(styledText)
-                    // when we hit the bottom, load the next page
-                    if (index == Dictionary.styledEntries.lastIndex) {
-                        LaunchedEffect(Dictionary.styledEntries.size) {
-                            Dictionary.loadNextPage(context)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+
+        // ────────────────
+        // 2️⃣ Either Search Results or Paginated Dictionary, filling remaining space
+        Spacer(modifier = Modifier.height(4.dp))
+
+        if (isSearching) {
+            if (searchResults.isEmpty()) {
+                // Show “no results” message, pinned at top of the list–area
+                Text(
+                    text = "No se encontraron resultados para \"$query\"",
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth()
+                        .weight(1f) // this pushes it to take up rest of space if needed
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f) // <— Let the list fill all available height
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(searchResults) { styledText ->
+                        Text(styledText)
+                    }
+                }
+            }
+        } else {
+            if (Dictionary.styledEntries.isEmpty()) {
+                Text(
+                    "Cargando diccionario…",
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth()
+                        .weight(1f) // still take up rest of space
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f) // <— Let the list fill all available height
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    itemsIndexed(Dictionary.styledEntries) { index, styledText ->
+                        Text(styledText)
+
+                        // When reaching the last visible item, load the next page.
+                        if (index == Dictionary.styledEntries.lastIndex) {
+                            LaunchedEffect(Dictionary.styledEntries.size) {
+                                Dictionary.loadNextPage(context)
+                            }
                         }
                     }
                 }
@@ -161,3 +271,4 @@ fun DictionaryBottomBar() {
         }
     }
 }
+
