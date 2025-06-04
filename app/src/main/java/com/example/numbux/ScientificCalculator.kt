@@ -296,10 +296,21 @@ fun ScientificCalculator() {
                                     }
                                 )
                             ) {
+                                // Tamaño y peso de fuente según etiqueta, recuperando el comportamiento original
+                                val (fontSize, fontWeight) = when (label) {
+                                    "+/-" -> 16.sp to FontWeight.Light
+                                    "C", "( )" -> 26.sp to FontWeight.Light
+                                    "%" -> 28.sp to FontWeight.Light
+                                    "÷", "×", "+" -> 46.sp to FontWeight.Light
+                                    "−" -> 60.sp to FontWeight.Light
+                                    "=" -> 56.sp to FontWeight.Light
+                                    else -> 34.sp to FontWeight.Medium  // incluye dígitos 1–9 y "."
+                                }
+
                                 Text(
-                                    text = label,
-                                    fontSize   = 34.sp,
-                                    fontWeight = FontWeight.Medium,
+                                    text       = label,
+                                    fontSize   = fontSize,
+                                    fontWeight = fontWeight,
                                     fontFamily = MaterialTheme.typography.titleLarge.fontFamily,
                                     modifier   = Modifier.scale(scaleFactor)
                                 )
