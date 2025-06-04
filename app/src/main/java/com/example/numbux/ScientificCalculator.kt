@@ -139,14 +139,14 @@ fun ScientificCalculator() {
         ) {
             // Tres filas adicionales + fila original + filas numéricas
             val buttons = listOf(
-                listOf("C",  "( )", "%",  "÷"),       // fila superior original
-                listOf("log", "sin", "cos", "tan"),   // fila 3: log, sin, cos, tan
-                listOf("ln", "e^x", "x^2", "x^y"),    // fila 2: ln, e^x, x^2, x^y
-                listOf("phi", "e", "√", ""),          // fila 1: phi, e, √, (vacío)
-                listOf("7",  "8",  "9",  "×"),        // fila 7,8,9,×
-                listOf("4",  "5",  "6",  "−"),        // fila 4,5,6,−
-                listOf("1",  "2",  "3",  "+"),        // fila 1,2,3,+
-                listOf("+/-","0",  ".",  "=")         // fila +/- 0 . =
+                listOf("C", "( )", "%", ""),
+                listOf("log", "sin", "cos", "tan"),
+                listOf("ln", "e^x", "x^2", "x^y"),
+                listOf("phi", "e", "√", "÷"), // tres botones, 1. x^y, 2.phi, e, log, ln 3. log", "sin", "cos", "tan"
+                listOf("7", "8", "9", "×"),
+                listOf("4", "5", "6", "−"),
+                listOf("1", "2", "3", "+"),
+                listOf("+/-", "0", ".", "=")
             )
 
             buttons.forEach { row ->
