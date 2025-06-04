@@ -94,7 +94,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.setValue
 import com.example.numbux.ui.DictionaryBottomBar
-
+import com.example.numbux.ui.ScientificCalculator
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -530,6 +530,14 @@ class MainActivity : ComponentActivity() {
                                     }
                                     2 -> {
                                         Text(
+                                            text = "Científica",
+                                            fontSize = 16.sp,
+                                            color = androidx.compose.ui.graphics.Color(0xFFFF6300),
+                                            modifier = Modifier.padding(horizontal = 4.dp)
+                                        )
+                                    }
+                                    3 -> {
+                                        Text(
                                             text = "Diccionario",
                                             fontSize = 16.sp,
                                             color = androidx.compose.ui.graphics.Color(0xFFFF6300),
@@ -614,7 +622,9 @@ class MainActivity : ComponentActivity() {
                                     BasicCalculator()
                                 }
                                 2 -> {
-                                    // Simple example: show every Latin→Spanish entry
+                                    ScientificCalculator()
+                                }
+                                3 -> {
                                     DictionaryBottomBar()
                                 }
                                 else -> {
