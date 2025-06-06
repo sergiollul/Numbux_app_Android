@@ -49,6 +49,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.platform.LocalDensity
 
 @Composable
 fun ScientificCalculator() {
@@ -263,192 +265,226 @@ fun ScientificCalculator() {
                                     )
                                 }
                             }
-                        } else {
-                            if (label == "( )") {
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .aspectRatio(1f)
-                                        .padding(3.dp)
-                                        .clip(CircleShape)                     // Recorta a círculo
-                                        .background(Color(0xFF2D2D2F))         // Color de fondo igual que antes
-                                        .pointerInput(Unit) {                  // Para distinguir tap corto y tap largo
-                                            detectTapGestures(
-                                                onTap = {
-                                                    // Tap corto: alterna "(" o ")"
-                                                    val text = fieldValue.text
-                                                    val sel  = fieldValue.selection.start
-                                                    val countOpen  = text.count { it == '(' }
-                                                    val countClose = text.count { it == ')' }
-                                                    val toInsert = if (countOpen > countClose) ")" else "("
-                                                    val newText = buildString {
-                                                        append(text.take(sel))
-                                                        append(toInsert)
-                                                        append(text.drop(sel))
-                                                    }
-                                                    fieldValue = TextFieldValue(newText, TextRange(sel + 1))
-                                                },
-                                                onLongPress = {
-                                                    // Tap largo: fuerza siempre insertar "("
-                                                    val text = fieldValue.text
-                                                    val sel  = fieldValue.selection.start
-                                                    val newText = buildString {
-                                                        append(text.take(sel))
-                                                        append("(")
-                                                        append(text.drop(sel))
-                                                    }
-                                                    fieldValue = TextFieldValue(newText, TextRange(sel + 1))
-                                                }
-                                            )
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text       = "( )",
-                                        fontSize   = 26.sp,
-                                        fontWeight = FontWeight.Light,
-                                        color      = Color.White
-                                    )
-                                }
-                            } else {
-                                // ─── BOTONES NORMALES ─────────────────────────────────
-                                Button(
-                                    onClick = {
-                                        when (label) {
-                                            "C" -> {
-                                                fieldValue = TextFieldValue("", TextRange(0))
-                                            }
-                                            "+/-" -> {
+                        } else if (label == "( )") {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .aspectRatio(1f)
+                                    .padding(3.dp)
+                                    .clip(CircleShape)                     // Recorta a círculo
+                                    .background(Color(0xFF2D2D2F))         // Color de fondo
+                                    .pointerInput(Unit) {                  // Tap corto / largo
+                                        detectTapGestures(
+                                            onTap = {
                                                 val text = fieldValue.text
                                                 val sel  = fieldValue.selection.start
-                                                if (text.startsWith("-")) {
-                                                    val newText = text.removePrefix("-")
-                                                    val newSel  = (sel - 1).coerceAtLeast(0)
-                                                    fieldValue = TextFieldValue(newText, TextRange(newSel))
-                                                } else {
-                                                    val newText = "-$text"
-                                                    fieldValue = TextFieldValue(newText, TextRange(sel + 1))
-                                                }
-                                            }
-                                            "=" -> {
-                                                val expr = fieldValue.text
-                                                val res  = evaluateExpression(expr)
-                                                fieldValue = TextFieldValue(res, TextRange(res.length))
-                                            }
-
-                                            // Dígitos y punto
-                                            in listOf("0","1","2","3","4","5","6","7","8","9",".") -> {
-                                                val sel = fieldValue.selection.start
+                                                val countOpen  = text.count { it == '(' }
+                                                val countClose = text.count { it == ')' }
+                                                val toInsert = if (countOpen > countClose) ")" else "("
                                                 val newText = buildString {
-                                                    append(fieldValue.text.take(sel))
-                                                    append(label)
-                                                    append(fieldValue.text.drop(sel))
+                                                    append(text.take(sel))
+                                                    append(toInsert)
+                                                    append(text.drop(sel))
+                                                }
+                                                fieldValue = TextFieldValue(newText, TextRange(sel + 1))
+                                            },
+                                            onLongPress = {
+                                                val text = fieldValue.text
+                                                val sel  = fieldValue.selection.start
+                                                val newText = buildString {
+                                                    append(text.take(sel))
+                                                    append("(")
+                                                    append(text.drop(sel))
                                                 }
                                                 fieldValue = TextFieldValue(newText, TextRange(sel + 1))
                                             }
-
-                                            // Operadores
-                                            "+"  -> insertarOperador("+")
-                                            "−"  -> insertarOperador("−")
-                                            "×"  -> insertarOperador("×")
-                                            "÷"  -> insertarOperador("÷")
-                                            "%"  -> insertarOperador("%")
-
-                                            // Raíz
-                                            "√" -> {
-                                                val sel = fieldValue.selection.start
-                                                val newText = buildString {
-                                                    append(fieldValue.text.take(sel))
-                                                    append("√(")
-                                                    append(fieldValue.text.drop(sel))
-                                                }
-                                                fieldValue = TextFieldValue(newText, TextRange(sel + 2))
-                                            }
-
-                                            // Potencia
-                                            "xʸ" -> {
-                                                val sel = fieldValue.selection.start
-                                                val newText = buildString {
-                                                    append(fieldValue.text.take(sel))
-                                                    append("^")
-                                                    append(fieldValue.text.drop(sel))
-                                                }
-                                                fieldValue = TextFieldValue(newText, TextRange(sel + 1))
-                                            }
-
-                                            // log
-                                            "log" -> {
-                                                val sel = fieldValue.selection.start
-                                                val newText = buildString {
-                                                    append(fieldValue.text.take(sel))
-                                                    append("log(")
-                                                    append(fieldValue.text.drop(sel))
-                                                }
-                                                fieldValue = TextFieldValue(newText, TextRange(sel + 4))
-                                            }
-
-                                            else -> {
-                                                val sel = fieldValue.selection.start
-                                                val newText = buildString {
-                                                    append(fieldValue.text.take(sel))
-                                                    append(label)
-                                                    append(fieldValue.text.drop(sel))
-                                                }
-                                                fieldValue = TextFieldValue(newText, TextRange(sel + label.length))
-                                            }
-                                        }
+                                        )
                                     },
-                                    interactionSource = interactionSource,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .aspectRatio(1f)
-                                        .padding(3.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = when {
-                                            label.matches(Regex("\\d")) || label == "." || label == "+/-" ->
-                                                Color(0xFF171719)
-
-                                            label in listOf("÷", "×", "+", "−") ->
-                                                Color(0xFFA6A6A6)
-
-                                            label in listOf("C", "( )", "%") ->
-                                                Color(0xFF2D2D2F)
-
-                                            else ->
-                                                MaterialTheme.colorScheme.primaryContainer
-                                        },
-                                        contentColor = when {
-                                            label.matches(Regex("\\d")) || label == "." || label == "+/-" ->
-                                                Color.White
-
-                                            label in listOf("C", "( )", "%") ->
-                                                Color.White
-
-                                            label in listOf("+", "−", "×", "÷") ->
-                                                Color.Black
-
-                                            else ->
-                                                LocalContentColor.current
-                                        }
-                                    )
-                                ) {
-                                    val (fontSize, fontWeight) = when (label) {
-                                        "+/-"     -> 16.sp to FontWeight.Light
-                                        "C", "( )" -> 26.sp to FontWeight.Light
-                                        "%"       -> 28.sp to FontWeight.Light
-                                        "÷", "×", "+" -> 46.sp to FontWeight.Light
-                                        "−"       -> 60.sp to FontWeight.Light
-                                        "="       -> 56.sp to FontWeight.Light
-                                        else      -> 34.sp to FontWeight.Medium
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text       = "( )",
+                                    fontSize   = 26.sp,
+                                    fontWeight = FontWeight.Light,
+                                    color      = Color.White
+                                )
+                            }
+                        } else if (label == "log") {
+                            Button(
+                                onClick = {
+                                    val sel = fieldValue.selection.start
+                                    val newText = buildString {
+                                        append(fieldValue.text.take(sel))
+                                        append("log(")
+                                        append(fieldValue.text.drop(sel))
                                     }
+                                    fieldValue = TextFieldValue(newText, TextRange(sel + 4))
+                                },
+                                interactionSource = interactionSource,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .aspectRatio(1f)
+                                    .padding(3.dp),
+                                // ← Solo aquí quitamos el contentPadding por completo:
+                                contentPadding = PaddingValues(0.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = when {
+                                        label.matches(Regex("\\d")) || label == "." || label == "+/-" ->
+                                            Color(0xFF171719)
+                                        label in listOf("÷", "×", "+", "−", "xʸ", "√", "log") ->
+                                            Color(0xFFA6A6A6)
+                                        label in listOf("C", "( )", "%") ->
+                                            Color(0xFF2D2D2F)
+                                        else ->
+                                            MaterialTheme.colorScheme.primaryContainer
+                                    },
+                                    contentColor = when {
+                                        label.matches(Regex("\\d")) || label == "." || label == "+/-" ->
+                                            Color.White
+                                        label in listOf("C", "( )", "%") ->
+                                            Color.White
+                                        label in listOf("+", "−", "×", "÷", "xʸ", "√", "log") ->
+                                            Color.Black
+                                        else ->
+                                            LocalContentColor.current
+                                    }
+                                )
+                            ) {
+                                BoxWithConstraints(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    val heightDp = this.maxHeight
+                                    val density  = LocalDensity.current
+
+                                    // Tomamos casi todo el alto disponible:
+                                    val fontSizeSp = with(density) {
+                                        (heightDp * 0.38f).toSp()
+                                    }
+
                                     Text(
-                                        text       = label,
-                                        fontSize   = fontSize,
-                                        fontWeight = fontWeight,
-                                        fontFamily = MaterialTheme.typography.titleLarge.fontFamily,
-                                        modifier   = Modifier.scale(scaleFactor)
+                                        text       = "log",
+                                        fontSize   = fontSizeSp,
+                                        fontWeight = FontWeight.Normal,
+                                        textAlign  = TextAlign.Center,
+                                        maxLines   = 1,
+                                        //modifier   = Modifier.offset(y = (-2).dp) // opcional: empuja la "g" un poco hacia arriba
                                     )
                                 }
+                            }
+                        } else {
+                            // ─── BOTONES NORMALES ─────────────────────────────────
+                            Button(
+                                onClick = {
+                                    when (label) {
+                                        "C" -> {
+                                            fieldValue = TextFieldValue("", TextRange(0))
+                                        }
+                                        "+/-" -> {
+                                            val text = fieldValue.text
+                                            val sel  = fieldValue.selection.start
+                                            if (text.startsWith("-")) {
+                                                val newText = text.removePrefix("-")
+                                                val newSel  = (sel - 1).coerceAtLeast(0)
+                                                fieldValue = TextFieldValue(newText, TextRange(newSel))
+                                            } else {
+                                                val newText = "-$text"
+                                                fieldValue = TextFieldValue(newText, TextRange(sel + 1))
+                                            }
+                                        }
+                                        "=" -> {
+                                            val expr = fieldValue.text
+                                            val res  = evaluateExpression(expr)
+                                            fieldValue = TextFieldValue(res, TextRange(res.length))
+                                        }
+                                        in listOf("0","1","2","3","4","5","6","7","8","9",".") -> {
+                                            val sel = fieldValue.selection.start
+                                            val newText = buildString {
+                                                append(fieldValue.text.take(sel))
+                                                append(label)
+                                                append(fieldValue.text.drop(sel))
+                                            }
+                                            fieldValue = TextFieldValue(newText, TextRange(sel + 1))
+                                        }
+                                        "+"  -> insertarOperador("+")
+                                        "−"  -> insertarOperador("−")
+                                        "×"  -> insertarOperador("×")
+                                        "÷"  -> insertarOperador("÷")
+                                        "%"  -> insertarOperador("%")
+                                        "√" -> {
+                                            val sel = fieldValue.selection.start
+                                            val newText = buildString {
+                                                append(fieldValue.text.take(sel))
+                                                append("√(")
+                                                append(fieldValue.text.drop(sel))
+                                            }
+                                            fieldValue = TextFieldValue(newText, TextRange(sel + 2))
+                                        }
+                                        "xʸ" -> {
+                                            val sel = fieldValue.selection.start
+                                            val newText = buildString {
+                                                append(fieldValue.text.take(sel))
+                                                append("^")
+                                                append(fieldValue.text.drop(sel))
+                                            }
+                                            fieldValue = TextFieldValue(newText, TextRange(sel + 1))
+                                        }
+                                        else -> {
+                                            val sel = fieldValue.selection.start
+                                            val newText = buildString {
+                                                append(fieldValue.text.take(sel))
+                                                append(label)
+                                                append(fieldValue.text.drop(sel))
+                                            }
+                                            fieldValue = TextFieldValue(newText, TextRange(sel + label.length))
+                                        }
+                                    }
+                                },
+                                interactionSource = interactionSource,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .aspectRatio(1f)
+                                    .padding(3.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = when {
+                                        label.matches(Regex("\\d")) || label == "." || label == "+/-" ->
+                                            Color(0xFF171719)
+                                        label in listOf("÷", "×", "+", "−", "xʸ", "√", "log") ->
+                                            Color(0xFFA6A6A6)
+                                        label in listOf("C", "( )", "%") ->
+                                            Color(0xFF2D2D2F)
+                                        else ->
+                                            MaterialTheme.colorScheme.primaryContainer
+                                    },
+                                    contentColor = when {
+                                        label.matches(Regex("\\d")) || label == "." || label == "+/-" ->
+                                            Color.White
+                                        label in listOf("C", "( )", "%") ->
+                                            Color.White
+                                        label in listOf("+", "−", "×", "÷", "xʸ", "√", "log") ->
+                                            Color.Black
+                                        else ->
+                                            LocalContentColor.current
+                                    }
+                                )
+                            ) {
+                                val (fontSize, fontWeight) = when (label) {
+                                    "+/-"        -> 16.sp to FontWeight.Light
+                                    "C", "( )"   -> 26.sp to FontWeight.Light
+                                    "%"          -> 28.sp to FontWeight.Light
+                                    "÷", "×", "+", "√" -> 46.sp to FontWeight.Light
+                                    "xʸ"         -> 36.sp to FontWeight.Light
+                                    "−"          -> 60.sp to FontWeight.Light
+                                    "="          -> 56.sp to FontWeight.Light
+                                    else         -> 34.sp to FontWeight.Medium
+                                }
+                                Text(
+                                    text       = label,
+                                    fontSize   = fontSize,
+                                    fontWeight = fontWeight,
+                                    fontFamily = MaterialTheme.typography.titleLarge.fontFamily,
+                                    modifier   = Modifier.scale(scaleFactor)
+                                )
                             }
                         }
                     }
