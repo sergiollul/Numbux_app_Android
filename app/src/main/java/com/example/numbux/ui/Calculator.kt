@@ -1,59 +1,49 @@
 package com.example.numbux.ui
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.FocusInteraction
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.ui.graphics.Color
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material.icons.Icons
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.outlined.Backspace
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.focusable
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.border
-import androidx.compose.runtime.*
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Backspace
 import kotlinx.coroutines.delay
-import androidx.compose.foundation.background       // ← add this
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.focusTarget
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.foundation.interaction.FocusInteraction
-
-
 
 @Composable
 fun BasicCalculator() {
-
-    var result     by remember { mutableStateOf("") }
+    var result by remember { mutableStateOf("") }
     val textFieldInteraction = remember { MutableInteractionSource() }
-    val focusRequester       = remember { FocusRequester() }
+    val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
         // give Compose a moment to lay out…
@@ -75,13 +65,13 @@ fun BasicCalculator() {
     ) {
         // 1) tappable, movable‐cursor display
         BasicTextField(
-            value             = fieldValue,
-            onValueChange     = { fieldValue = it },
-            readOnly          = true,
+            value = fieldValue,
+            onValueChange = { fieldValue = it },
+            readOnly = true,
             interactionSource = textFieldInteraction,
-            cursorBrush       = SolidColor(Color(0xFFFF6300)),
-            textStyle         = MaterialTheme.typography.headlineMedium.copy(
-                color     = MaterialTheme.colorScheme.onSurface,
+            cursorBrush = SolidColor(Color(0xFFFF6300)),
+            textStyle = MaterialTheme.typography.headlineMedium.copy(
+                color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.End
             ),
             modifier = Modifier
@@ -92,13 +82,12 @@ fun BasicCalculator() {
             decorationBox = { inner ->
                 Box(
                     modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.CenterEnd     // ← push both text & caret to the right
+                    contentAlignment = Alignment.CenterEnd
                 ) {
                     inner()
                 }
             }
         )
-
 
         // ROW SOLO para el botón back, sin padding vertical extra
         Row(
@@ -115,16 +104,16 @@ fun BasicCalculator() {
                         fieldValue = TextFieldValue(newText, TextRange(pos - 1))
                     }
                 },
-                modifier = Modifier.size(50.dp),  // botón más grande…
+                modifier = Modifier.size(50.dp),
                 colors = IconButtonDefaults.iconButtonColors(
                     containerColor = Color.Transparent,
-                    contentColor   = Color(0xFFFF6300)
+                    contentColor = Color(0xFFFF6300)
                 )
             ) {
                 Icon(
-                    imageVector        = Icons.Outlined.Backspace,
+                    imageVector = Icons.Outlined.Backspace,
                     contentDescription = "Backspace",
-                    modifier           = Modifier.size(28.dp)  // …pero icono interno igual
+                    modifier = Modifier.size(28.dp)
                 )
             }
         }
@@ -132,32 +121,30 @@ fun BasicCalculator() {
         // Separador con espacio arriba y abajo
         Spacer(modifier = Modifier.height(14.dp))
         Divider(
-            color     = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
             thickness = 2.dp,
-            modifier  = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth()
         )
         Spacer(modifier = Modifier.height(30.dp))
 
         // Encapsulamos el grid de botones en su propia Column
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(4.dp)   // sólo 4dp entre filas
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-
             // Layout de botones idéntico a tu captura:
             val buttons = listOf(
-                listOf("C",  "( )", "%",  "÷"),
-                listOf("7",  "8",  "9",  "×"),
-                listOf("4",  "5",  "6",  "−"),
-                listOf("1",  "2",  "3",  "+"),
-                listOf("+/-","0",  ".",  "=")
+                listOf("C", "( )", "%", "÷"),
+                listOf("7", "8", "9", "×"),
+                listOf("4", "5", "6", "−"),
+                listOf("1", "2", "3", "+"),
+                listOf("+/-", "0", ".", "=")
             )
 
             buttons.forEach { row ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        //.padding(vertical = 2.dp)    // espacio entre filas
                         .height(IntrinsicSize.Min),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -168,149 +155,215 @@ fun BasicCalculator() {
                         val isPressed by interactionSource.collectIsPressedAsState()
                         val scaleFactor by animateFloatAsState(if (isPressed) 0.6f else 1f)
 
-                        Button(
-                            onClick = {
-                                when (label) {
-                                    "C" -> {
-                                        // Clear everything and reset caret
-                                        fieldValue = TextFieldValue("", TextRange(0))
-                                    }
-                                    "( )" -> {
-                                        // Toggle parentheses: if no “(” yet, insert “(” at cursor; else insert “)”
-                                        val text = fieldValue.text
-                                        val sel  = fieldValue.selection.start
-                                        val toInsert = if (!text.contains("(")) "(" else ")"
-                                        val newText = buildString {
-                                            append(text.take(sel))
-                                            append(toInsert)
-                                            append(text.drop(sel))
-                                        }
-                                        fieldValue = TextFieldValue(newText, TextRange(sel + 1))
-                                    }
-                                    "+/-" -> {
-                                        val text   = fieldValue.text
-                                        val cursor = fieldValue.selection.start
+                        if (label == "( )") {
+                            // ① Estado para detectar si ha ocurrido un long press
+                            var isPressedParent by remember { mutableStateOf(false) }
+                            var didLongPress by remember { mutableStateOf(false) }
 
-                                        // 1) Encontrar el índice de inicio del número donde está el cursor:
-                                        var startIndex = cursor
-                                        while (startIndex > 0 && (text[startIndex - 1].isDigit() || text[startIndex - 1] == '.')) {
-                                            startIndex--
-                                        }
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .aspectRatio(1f)
+                                    .padding(3.dp)
+                                    // Forma circular + fondo
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF2D2D2F))
+                                    // ② PointerInput que gestiona tanto onPress como onLongPress
+                                    .pointerInput(Unit) {
+                                        detectTapGestures(
+                                            onPress = {
+                                                // Marcamos que estamos presionando
+                                                isPressedParent = true
+                                                try {
+                                                    // Esperamos a que suelten el dedo (o cancelen)
+                                                    awaitRelease()
+                                                    // Solo si NO hubo longPress, hacemos el toggle de “(” / “)”
+                                                    if (!didLongPress) {
+                                                        val text = fieldValue.text
+                                                        val sel = fieldValue.selection.start
+                                                        val countOpen = text.count { it == '(' }
+                                                        val countClose = text.count { it == ')' }
+                                                        val toInsert =
+                                                            if (countOpen > countClose) ")" else "("
 
-                                        // 2) Encontrar el índice de fin de ese mismo número:
-                                        var endIndex = cursor
-                                        while (endIndex < text.length && (text[endIndex].isDigit() || text[endIndex] == '.')) {
-                                            endIndex++
-                                        }
-
-                                        // 3) Comprobar si justo antes de startIndex hay un signo “-” que actúe como unario:
-                                        //    Debe ser un “-” y, o bien estar en la posición 0, o bien el carácter anterior
-                                        //    a ese “-” es un operador o paréntesis izquierdo, para asegurarnos de que es un “-” unario.
-                                        val hasMinus = startIndex > 0 && text[startIndex - 1] == '-'
-                                        val isUnaryMinus = if (hasMinus) {
-                                            // Si está en posición 1 (startIndex-1 == 0), es un “-” unario en el comienzo
-                                            if (startIndex - 1 == 0) true
-                                            else {
-                                                // Si el carácter anterior a ese “-” es uno de los operadores o “(”
-                                                val prev = text[startIndex - 2]
-                                                prev in listOf('+', '−', '×', '÷', '*', '/', '^', '(', '%')
+                                                        val newText = buildString {
+                                                            append(text.take(sel))
+                                                            append(toInsert)
+                                                            append(text.drop(sel))
+                                                        }
+                                                        fieldValue = TextFieldValue(
+                                                            newText,
+                                                            TextRange(sel + 1)
+                                                        )
+                                                    }
+                                                } finally {
+                                                    // Al terminar (up o cancel), reseteamos ambos flags
+                                                    isPressedParent = false
+                                                    didLongPress = false
+                                                }
+                                            },
+                                            onLongPress = {
+                                                // Cuando ocurre long press, insertamos siempre “(”
+                                                didLongPress = true
+                                                val text = fieldValue.text
+                                                val sel = fieldValue.selection.start
+                                                val newText = buildString {
+                                                    append(text.take(sel))
+                                                    append("(")
+                                                    append(text.drop(sel))
+                                                }
+                                                fieldValue =
+                                                    TextFieldValue(newText, TextRange(sel + 1))
                                             }
-                                        } else {
-                                            false
-                                        }
-
-                                        val newText: String
-                                        val newCursor: Int
-
-                                        if (isUnaryMinus) {
-                                            // 4.a) Si ya había un “-” unario, lo quitamos:
-                                            newText = text.removeRange(startIndex - 1, startIndex)
-                                            newCursor = cursor - 1
-                                        } else {
-                                            // 4.b) Si no había un “-” unario, lo insertamos antes del número:
-                                            newText = buildString {
-                                                append(text.take(startIndex))
-                                                append("-")
-                                                append(text.drop(startIndex))
-                                            }
-                                            newCursor = cursor + 1
-                                        }
-
-                                        fieldValue = TextFieldValue(newText, TextRange(newCursor))
-                                    }
-                                    "=" -> {
-                                        val expr = fieldValue.text
-                                            .replace("×", "*")
-                                            .replace("÷", "/")
-                                            .replace("−", "-")
-                                        val res = evaluateExpression(expr)
-                                        fieldValue = TextFieldValue(res, TextRange(res.length))
-                                    }
-                                    else -> {
-                                        // here’s the corrected nested if/else:
-                                        if (result.isNotEmpty() && label.matches(Regex("[0-9.]"))) {
-                                            // start a new number after a result
-                                            fieldValue = TextFieldValue(label, TextRange(1))
-                                            result     = ""
-                                        } else {
-                                            // insert at the current cursor position
-                                            val sel     = fieldValue.selection.start
-                                            val newText = buildString {
-                                                append(fieldValue.text.take(sel))
-                                                append(label)
-                                                append(fieldValue.text.drop(sel))
-                                            }
-                                            fieldValue = TextFieldValue(newText, TextRange(sel + label.length))
-                                        }
-                                    }
-                                }
-                            },
-                            interactionSource = interactionSource,
-                            modifier = Modifier
-                                .weight(1f)
-                                .aspectRatio(1f)
-                                .padding(3.dp),              // padding extra para que no se toquen
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = when {
-                                    label.matches(Regex("\\d")) || label in listOf(".", "+/-") ->
-                                        Color(0xFF171719)
-                                    label in listOf("÷", "×", "+", "−") ->
-                                        Color(0xFFA6A6A6)
-                                    label in listOf("C", "( )", "%") ->
-                                        Color(0xFF2D2D2F)
-                                    else ->
-                                        MaterialTheme.colorScheme.primaryContainer
-                                },
-                                contentColor = when {
-                                    label.matches(Regex("\\d")) || label in listOf(".", "+/-") ->
-                                        Color.White
-                                    label in listOf("C", "( )", "%") ->
-                                        Color.White
-                                    label in listOf("+", "−", "×", "÷") ->
-                                        Color.Black
-                                    else ->
-                                        LocalContentColor.current
-                                }
-                            )
-                        ) {
-                            // Tamaño de fuente por etiqueta
-                            val (fontSize, fontWeight) = when (label) {
-                                "+/-" -> 16.sp to FontWeight.Light
-                                "C", "( )" -> 26.sp to FontWeight.Light
-                                "%" -> 28.sp to FontWeight.Light
-                                "÷", "×", "+" -> 46.sp to FontWeight.Light
-                                "−" -> 60.sp to FontWeight.Light
-                                "=" -> 56.sp to FontWeight.Light
-                                else -> 34.sp to FontWeight.Medium
+                                        )
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                // ③ Solo escalamos el texto según “isPressedParent”
+                                Text(
+                                    text = "( )",
+                                    fontSize = 26.sp,
+                                    fontWeight = FontWeight.Light,
+                                    color = Color.White,
+                                    modifier = Modifier.scale(if (isPressedParent) 0.85f else 1f)
+                                )
                             }
+                        } else {
+                            Button(
+                                onClick = {
+                                    when (label) {
+                                        "C" -> {
+                                            // Clear everything and reset caret
+                                            fieldValue = TextFieldValue("", TextRange(0))
+                                        }
+                                        "%" -> {
+                                            val text = fieldValue.text
+                                            val sel = fieldValue.selection.start
+                                            val newText = buildString {
+                                                append(text.take(sel))
+                                                append("%")
+                                                append(text.drop(sel))
+                                            }
+                                            fieldValue = TextFieldValue(newText, TextRange(sel + 1))
+                                        }
+                                        "+/-" -> {
+                                            val text = fieldValue.text
+                                            val cursor = fieldValue.selection.start
 
-                            Text(
-                                text = label,
-                                fontSize = fontSize,
-                                fontWeight = fontWeight,
-                                fontFamily = MaterialTheme.typography.titleLarge.fontFamily,
-                                modifier = Modifier.scale(scaleFactor)
-                            )
+                                            // 1) Encontrar el índice de inicio del número donde está el cursor:
+                                            var startIndex = cursor
+                                            while (startIndex > 0 && (text[startIndex - 1].isDigit() || text[startIndex - 1] == '.')) {
+                                                startIndex--
+                                            }
+
+                                            // 2) Encontrar el índice de fin de ese mismo número:
+                                            var endIndex = cursor
+                                            while (endIndex < text.length && (text[endIndex].isDigit() || text[endIndex] == '.')) {
+                                                endIndex++
+                                            }
+
+                                            // 3) Comprobar si justo antes de startIndex hay un signo “-” que actúe como unario:
+                                            val hasMinus = startIndex > 0 && text[startIndex - 1] == '-'
+                                            val isUnaryMinus = if (hasMinus) {
+                                                if (startIndex - 1 == 0) true
+                                                else {
+                                                    val prev = text[startIndex - 2]
+                                                    prev in listOf('+', '−', '×', '÷', '*', '/', '^', '(', '%')
+                                                }
+                                            } else {
+                                                false
+                                            }
+
+                                            val newText: String
+                                            val newCursor: Int
+
+                                            if (isUnaryMinus) {
+                                                // 4.a) Si ya había un “-” unario, lo quitamos:
+                                                newText = text.removeRange(startIndex - 1, startIndex)
+                                                newCursor = cursor - 1
+                                            } else {
+                                                // 4.b) Si no había un “-” unario, lo insertamos antes del número:
+                                                newText = buildString {
+                                                    append(text.take(startIndex))
+                                                    append("-")
+                                                    append(text.drop(startIndex))
+                                                }
+                                                newCursor = cursor + 1
+                                            }
+
+                                            fieldValue = TextFieldValue(newText, TextRange(newCursor))
+                                        }
+                                        "=" -> {
+                                            val expr = fieldValue.text
+                                                .replace("×", "*")
+                                                .replace("÷", "/")
+                                                .replace("−", "-")
+                                            val res = evaluateExpression(expr)
+                                            fieldValue = TextFieldValue(res, TextRange(res.length))
+                                        }
+                                        else -> {
+                                            if (result.isNotEmpty() && label.matches(Regex("[0-9.]"))) {
+                                                // start a new number after a result
+                                                fieldValue = TextFieldValue(label, TextRange(1))
+                                                result = ""
+                                            } else {
+                                                val sel = fieldValue.selection.start
+                                                val newText = buildString {
+                                                    append(fieldValue.text.take(sel))
+                                                    append(label)
+                                                    append(fieldValue.text.drop(sel))
+                                                }
+                                                fieldValue = TextFieldValue(newText, TextRange(sel + label.length))
+                                            }
+                                        }
+                                    }
+                                },
+                                interactionSource = interactionSource,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .aspectRatio(1f)
+                                    .padding(3.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = when {
+                                        label.matches(Regex("\\d")) || label in listOf(".", "+/-") ->
+                                            Color(0xFF171719)
+                                        label in listOf("÷", "×", "+", "−") ->
+                                            Color(0xFFA6A6A6)
+                                        label in listOf("C", "%") ->
+                                            Color(0xFF2D2D2F)
+                                        else ->
+                                            MaterialTheme.colorScheme.primaryContainer
+                                    },
+                                    contentColor = when {
+                                        label.matches(Regex("\\d")) || label in listOf(".", "+/-") ->
+                                            Color.White
+                                        label in listOf("C", "%") ->
+                                            Color.White
+                                        label in listOf("+", "−", "×", "÷") ->
+                                            Color.Black
+                                        else ->
+                                            LocalContentColor.current
+                                    }
+                                )
+                            ) {
+                                val (fontSize, fontWeight) = when (label) {
+                                    "+/-" -> 16.sp to FontWeight.Light
+                                    "C" -> 26.sp to FontWeight.Light
+                                    "%" -> 28.sp to FontWeight.Light
+                                    "÷", "×", "+" -> 46.sp to FontWeight.Light
+                                    "−" -> 60.sp to FontWeight.Light
+                                    "=" -> 56.sp to FontWeight.Light
+                                    else -> 34.sp to FontWeight.Medium
+                                }
+
+                                Text(
+                                    text = label,
+                                    fontSize = fontSize,
+                                    fontWeight = fontWeight,
+                                    fontFamily = MaterialTheme.typography.titleLarge.fontFamily,
+                                    modifier = Modifier.scale(scaleFactor)
+                                )
+                            }
                         }
                     }
                 }
@@ -338,11 +391,11 @@ private fun toRPN(expr: String): List<String> {
         when (val c = expr[i]) {
             in '0'..'9', '.' -> {
                 val start = i
-                while (i < expr.length && (expr[i].isDigit() || expr[i]=='.')) i++
+                while (i < expr.length && (expr[i].isDigit() || expr[i] == '.')) i++
                 output += expr.substring(start, i)
                 continue
             }
-            '+','-','*','/' -> {
+            '+', '-', '*', '/' -> {
                 while (ops.isNotEmpty() && precedence(ops.first()) >= precedence(c)) {
                     output += ops.removeFirst().toString()
                 }
@@ -385,8 +438,8 @@ private fun evalRPN(tokens: List<String>): Double {
     return stack.first()
 }
 
-private fun precedence(op: Char): Int = when(op) {
-    '+','-' -> 1
-    '*','/' -> 2
-    else    -> 0
+private fun precedence(op: Char): Int = when (op) {
+    '+', '-' -> 1
+    '*', '/' -> 2
+    else -> 0
 }

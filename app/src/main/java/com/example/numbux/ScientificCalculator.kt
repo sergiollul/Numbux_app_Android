@@ -335,7 +335,7 @@ fun ScientificCalculator() {
                                     fontSize = 26.sp,
                                     fontWeight = FontWeight.Light,
                                     color = Color.White,
-                                    modifier = Modifier.scale(if (isPressed) 0.6f else 1f)
+                                    modifier = Modifier.scale(if (isPressed) 0.85f else 1f)
                                 )
                             }
                         }else if (label == "log") {
