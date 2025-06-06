@@ -208,6 +208,46 @@ fun ScientificCalculator() {
                                             showPiMenu = false
                                         }
                                     )
+                                    DropdownMenuItem(
+                                        text    = { Text(text = "ln") },
+                                        onClick = {
+                                            val sel = fieldValue.selection.start
+                                            val newText =
+                                                fieldValue.text.take(sel) + "e" + fieldValue.text.drop(sel)
+                                            fieldValue = TextFieldValue(newText, TextRange(sel + 1))
+                                            showPiMenu = false
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text    = { Text(text = "sin") },
+                                        onClick = {
+                                            val sel = fieldValue.selection.start
+                                            val newText =
+                                                fieldValue.text.take(sel) + "e" + fieldValue.text.drop(sel)
+                                            fieldValue = TextFieldValue(newText, TextRange(sel + 1))
+                                            showPiMenu = false
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text    = { Text(text = "cos") },
+                                        onClick = {
+                                            val sel = fieldValue.selection.start
+                                            val newText =
+                                                fieldValue.text.take(sel) + "e" + fieldValue.text.drop(sel)
+                                            fieldValue = TextFieldValue(newText, TextRange(sel + 1))
+                                            showPiMenu = false
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text    = { Text(text = "tan") },
+                                        onClick = {
+                                            val sel = fieldValue.selection.start
+                                            val newText =
+                                                fieldValue.text.take(sel) + "e" + fieldValue.text.drop(sel)
+                                            fieldValue = TextFieldValue(newText, TextRange(sel + 1))
+                                            showPiMenu = false
+                                        }
+                                    )
                                 }
                             }
                         } else {
