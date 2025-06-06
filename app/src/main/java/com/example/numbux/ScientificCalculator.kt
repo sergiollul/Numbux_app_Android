@@ -2,6 +2,7 @@ package com.example.numbux.ui
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.FocusInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -33,6 +34,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
@@ -41,12 +43,27 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlin.math.*
-
+import androidx.compose.material3.Surface
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 
 @Composable
 fun ScientificCalculator() {
     var fieldValue by remember { mutableStateOf(TextFieldValue(text = "", selection = TextRange(0))) }
     var showPiMenu by remember { mutableStateOf(false) }
+
+    fun insertarOperador(op: String) {
+        val sel = fieldValue.selection.start
+        val newText = buildString {
+            append(fieldValue.text.take(sel))
+            append(op)
+            append(fieldValue.text.drop(sel))
+        }
+        fieldValue = TextFieldValue(newText, TextRange(sel + op.length))
+    }
 
     // Para gestionar el foco en el BasicTextField
     val textFieldInteraction = remember { MutableInteractionSource() }
@@ -247,55 +264,98 @@ fun ScientificCalculator() {
                                 }
                             }
                         } else {
-                            // ─── BOTONES NORMALES ─────────────────────────────────
-                            Button(
-                                onClick = {
-                                    when (label) {
-                                        "C" -> {
-                                            fieldValue = TextFieldValue("", TextRange(0))
-                                        }
-                                        "( )" -> {
-                                            val text = fieldValue.text
-                                            val sel  = fieldValue.selection.start
-                                            val toInsert = "("  // simplemente inserta “(”
-                                            val newText = buildString {
-                                                append(text.take(sel))
-                                                append(toInsert)
-                                                append(text.drop(sel))
+                            if (label == "( )") {
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .aspectRatio(1f)
+                                        .padding(3.dp)
+                                        .clip(CircleShape)                     // Recorta a círculo
+                                        .background(Color(0xFF2D2D2F))         // Color de fondo igual que antes
+                                        .pointerInput(Unit) {                  // Para distinguir tap corto y tap largo
+                                            detectTapGestures(
+                                                onTap = {
+                                                    // Tap corto: alterna "(" o ")"
+                                                    val text = fieldValue.text
+                                                    val sel  = fieldValue.selection.start
+                                                    val countOpen  = text.count { it == '(' }
+                                                    val countClose = text.count { it == ')' }
+                                                    val toInsert = if (countOpen > countClose) ")" else "("
+                                                    val newText = buildString {
+                                                        append(text.take(sel))
+                                                        append(toInsert)
+                                                        append(text.drop(sel))
+                                                    }
+                                                    fieldValue = TextFieldValue(newText, TextRange(sel + 1))
+                                                },
+                                                onLongPress = {
+                                                    // Tap largo: fuerza siempre insertar "("
+                                                    val text = fieldValue.text
+                                                    val sel  = fieldValue.selection.start
+                                                    val newText = buildString {
+                                                        append(text.take(sel))
+                                                        append("(")
+                                                        append(text.drop(sel))
+                                                    }
+                                                    fieldValue = TextFieldValue(newText, TextRange(sel + 1))
+                                                }
+                                            )
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text       = "( )",
+                                        fontSize   = 26.sp,
+                                        fontWeight = FontWeight.Light,
+                                        color      = Color.White
+                                    )
+                                }
+                            } else {
+                                // ─── BOTONES NORMALES ─────────────────────────────────
+                                Button(
+                                    onClick = {
+                                        when (label) {
+                                            "C" -> {
+                                                fieldValue = TextFieldValue("", TextRange(0))
                                             }
-                                            fieldValue = TextFieldValue(newText, TextRange(sel + 1))
-                                        }
-                                        "+/-" -> {
-                                            val text = fieldValue.text
-                                            val sel  = fieldValue.selection.start
-                                            if (text.startsWith("-")) {
-                                                val newText = text.removePrefix("-")
-                                                val newSel  = (sel - 1).coerceAtLeast(0)
-                                                fieldValue = TextFieldValue(newText, TextRange(newSel))
-                                            } else {
-                                                val newText = "-$text"
-                                                fieldValue = TextFieldValue(newText, TextRange(sel + 1))
+                                            "+/-" -> {
+                                                val text = fieldValue.text
+                                                val sel  = fieldValue.selection.start
+                                                if (text.startsWith("-")) {
+                                                    val newText = text.removePrefix("-")
+                                                    val newSel  = (sel - 1).coerceAtLeast(0)
+                                                    fieldValue = TextFieldValue(newText, TextRange(newSel))
+                                                } else {
+                                                    val newText = "-$text"
+                                                    fieldValue = TextFieldValue(newText, TextRange(sel + 1))
+                                                }
                                             }
-                                        }
-                                        "=" -> {
-                                            // Reemplaza “×”/“÷”/“−”/“xʸ” en evaluateExpression
-                                            val expr = fieldValue.text
-                                            val res = evaluateExpression(expr)
-                                            fieldValue = TextFieldValue(res, TextRange(res.length))
-                                        }
-                                        else -> {
-                                            // Inserta dígito u operador (cubre “%”, “÷”, “×”, “−”, “+”, “.”, dígitos)
-                                            if (label == "xʸ") {
-                                                // inserta “^” en vez de la flecha
+                                            "=" -> {
+                                                val expr = fieldValue.text
+                                                val res  = evaluateExpression(expr)
+                                                fieldValue = TextFieldValue(res, TextRange(res.length))
+                                            }
+
+                                            // Dígitos y punto
+                                            in listOf("0","1","2","3","4","5","6","7","8","9",".") -> {
                                                 val sel = fieldValue.selection.start
                                                 val newText = buildString {
                                                     append(fieldValue.text.take(sel))
-                                                    append("^")
+                                                    append(label)
                                                     append(fieldValue.text.drop(sel))
                                                 }
                                                 fieldValue = TextFieldValue(newText, TextRange(sel + 1))
-                                            } else if (label == "√") {
-                                                // inserta “√(” para que el parser lo convierta a “sqrt(”
+                                            }
+
+                                            // Operadores
+                                            "+"  -> insertarOperador("+")
+                                            "−"  -> insertarOperador("−")
+                                            "×"  -> insertarOperador("×")
+                                            "÷"  -> insertarOperador("÷")
+                                            "%"  -> insertarOperador("%")
+
+                                            // Raíz
+                                            "√" -> {
                                                 val sel = fieldValue.selection.start
                                                 val newText = buildString {
                                                     append(fieldValue.text.take(sel))
@@ -303,66 +363,92 @@ fun ScientificCalculator() {
                                                     append(fieldValue.text.drop(sel))
                                                 }
                                                 fieldValue = TextFieldValue(newText, TextRange(sel + 2))
-                                            } else {
-                                                // caso normal: números y {%, ÷, ×, −, +, .}
+                                            }
+
+                                            // Potencia
+                                            "xʸ" -> {
+                                                val sel = fieldValue.selection.start
+                                                val newText = buildString {
+                                                    append(fieldValue.text.take(sel))
+                                                    append("^")
+                                                    append(fieldValue.text.drop(sel))
+                                                }
+                                                fieldValue = TextFieldValue(newText, TextRange(sel + 1))
+                                            }
+
+                                            // log
+                                            "log" -> {
+                                                val sel = fieldValue.selection.start
+                                                val newText = buildString {
+                                                    append(fieldValue.text.take(sel))
+                                                    append("log(")
+                                                    append(fieldValue.text.drop(sel))
+                                                }
+                                                fieldValue = TextFieldValue(newText, TextRange(sel + 4))
+                                            }
+
+                                            else -> {
                                                 val sel = fieldValue.selection.start
                                                 val newText = buildString {
                                                     append(fieldValue.text.take(sel))
                                                     append(label)
                                                     append(fieldValue.text.drop(sel))
                                                 }
-                                                fieldValue = TextFieldValue(
-                                                    newText,
-                                                    TextRange(sel + label.length)
-                                                )
+                                                fieldValue = TextFieldValue(newText, TextRange(sel + label.length))
                                             }
                                         }
-                                    }
-                                },
-                                interactionSource = interactionSource,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .aspectRatio(1f)
-                                    .padding(3.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = when {
-                                        label.matches(Regex("\\d")) || label in listOf(".", "+/-") ->
-                                            Color(0xFF171719)
-                                        label in listOf("÷", "×", "+", "−") ->
-                                            Color(0xFFA6A6A6)
-                                        label in listOf("C", "( )", "%") ->
-                                            Color(0xFF2D2D2F)
-                                        else ->
-                                            MaterialTheme.colorScheme.primaryContainer
                                     },
-                                    contentColor = when {
-                                        label.matches(Regex("\\d")) || label in listOf(".", "+/-") ->
-                                            Color.White
-                                        label in listOf("C", "( )", "%") ->
-                                            Color.White
-                                        label in listOf("+", "−", "×", "÷") ->
-                                            Color.Black
-                                        else ->
-                                            LocalContentColor.current
+                                    interactionSource = interactionSource,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .aspectRatio(1f)
+                                        .padding(3.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = when {
+                                            label.matches(Regex("\\d")) || label == "." || label == "+/-" ->
+                                                Color(0xFF171719)
+
+                                            label in listOf("÷", "×", "+", "−") ->
+                                                Color(0xFFA6A6A6)
+
+                                            label in listOf("C", "( )", "%") ->
+                                                Color(0xFF2D2D2F)
+
+                                            else ->
+                                                MaterialTheme.colorScheme.primaryContainer
+                                        },
+                                        contentColor = when {
+                                            label.matches(Regex("\\d")) || label == "." || label == "+/-" ->
+                                                Color.White
+
+                                            label in listOf("C", "( )", "%") ->
+                                                Color.White
+
+                                            label in listOf("+", "−", "×", "÷") ->
+                                                Color.Black
+
+                                            else ->
+                                                LocalContentColor.current
+                                        }
+                                    )
+                                ) {
+                                    val (fontSize, fontWeight) = when (label) {
+                                        "+/-"     -> 16.sp to FontWeight.Light
+                                        "C", "( )" -> 26.sp to FontWeight.Light
+                                        "%"       -> 28.sp to FontWeight.Light
+                                        "÷", "×", "+" -> 46.sp to FontWeight.Light
+                                        "−"       -> 60.sp to FontWeight.Light
+                                        "="       -> 56.sp to FontWeight.Light
+                                        else      -> 34.sp to FontWeight.Medium
                                     }
-                                )
-                            ) {
-                                val (fontSize, fontWeight) = when (label) {
-                                    "+/-" -> 16.sp to FontWeight.Light
-                                    "C", "( )" -> 26.sp to FontWeight.Light
-                                    "%" -> 28.sp to FontWeight.Light
-                                    "÷", "×", "+" -> 46.sp to FontWeight.Light
-                                    "−" -> 60.sp to FontWeight.Light
-                                    "=" -> 56.sp to FontWeight.Light
-                                    else -> 34.sp to FontWeight.Medium
+                                    Text(
+                                        text       = label,
+                                        fontSize   = fontSize,
+                                        fontWeight = fontWeight,
+                                        fontFamily = MaterialTheme.typography.titleLarge.fontFamily,
+                                        modifier   = Modifier.scale(scaleFactor)
+                                    )
                                 }
-                                Text(
-                                    text       = label,
-                                    fontSize   = fontSize,
-                                    fontWeight = fontWeight,
-                                    fontFamily = MaterialTheme.typography.titleLarge.fontFamily,
-                                    modifier   = Modifier.scale(scaleFactor)
-                                )
                             }
                         }
                     }
@@ -372,17 +458,17 @@ fun ScientificCalculator() {
     }
 }
 
+// ───────────────────────────────────────────────────────────
+// ─── A PARTIR DE AQUÍ VAN LAS FUNCIONES DE EVALUACIÓN ───
+// ───────────────────────────────────────────────────────────
 
-// ─── Evaluador de expresiones (Shunting‐Yard completo) ─────────────────────
-
-// 1) Función que cierra todos los paréntesis abiertos
+// 1) Para cerrar automáticamente paréntesis que falten
 private fun balanceParentheses(input: String): String {
     var openCount = 0
     for (ch in input) {
         if (ch == '(') openCount++
         else if (ch == ')') openCount--
     }
-    // Si openCount > 0, faltan tantos ‘)’ al final
     return if (openCount > 0) {
         input + ")".repeat(openCount)
     } else {
@@ -390,10 +476,9 @@ private fun balanceParentheses(input: String): String {
     }
 }
 
-// 2) evaluateExpression modificado para “auto‐cerrar” paréntesis
+// 2) evaluateExpression usa balanceParentheses y luego toRPN + evalRPN
 private fun evaluateExpression(exprInput: String): String {
     return try {
-        // 2.a Normalizas símbolos especiales (√ → sqrt, × → *, ÷ → /, − → - …)
         var expr = exprInput
             .replace("×", "*")
             .replace("÷", "/")
@@ -403,14 +488,11 @@ private fun evaluateExpression(exprInput: String): String {
             .replace("%", "/100")
             .trim()
 
-        // 2.b Balanceas paréntesis: si falta un “)” al final, se agrega aquí
         expr = balanceParentheses(expr)
 
-        // 2.c Llamas al resto de la lógica de RPN
         val rpnValue = toRPN(expr)
         val result   = evalRPN(rpnValue)
 
-        // 2.d Formateas el resultado (sin “.0” si es entero)
         if (result.isInfinite() || result.isNaN()) {
             "Error"
         } else {
@@ -425,8 +507,7 @@ private fun evaluateExpression(exprInput: String): String {
     }
 }
 
-
-// 3) toRPN: convierte la cadena infija en tokens RPN
+// 3) Convierte la expresión infija a una lista de tokens RPN
 private fun toRPN(expr: String): List<String> {
     val output = mutableListOf<String>()
     val ops = ArrayDeque<String>()
@@ -439,21 +520,16 @@ private fun toRPN(expr: String): List<String> {
         else    -> 0
     }
 
-    fun isLeftAssociative(op: String): Boolean = when (op) {
-        "^" -> false
-        else -> true
-    }
+    fun isLeftAssociative(op: String): Boolean = (op != "^")
 
     var i = 0
     while (i < expr.length) {
         val c = expr[i]
-
         if (c.isWhitespace()) {
             i++
             continue
         }
-
-        // Números
+        // Si es dígito o punto, parseamos el número completo
         if (c.isDigit() || c == '.') {
             val start = i
             while (i < expr.length && (expr[i].isDigit() || expr[i] == '.')) {
@@ -462,8 +538,7 @@ private fun toRPN(expr: String): List<String> {
             output += expr.substring(start, i)
             continue
         }
-
-        // Funciones o constantes
+        // Si es letra (función) o constante π/e
         if (c.isLetter() || c == 'π' || c == 'e') {
             val start = i
             while (i < expr.length && (expr[i].isLetter() || expr[i] == 'π' || expr[i] == 'e')) {
@@ -477,15 +552,13 @@ private fun toRPN(expr: String): List<String> {
             }
             continue
         }
-
-        // Paréntesis abriendo
+        // Paréntesis izquierdo
         if (c == '(') {
             ops.addFirst("(")
             i++
             continue
         }
-
-        // Paréntesis cerrando
+        // Paréntesis derecho
         if (c == ')') {
             while (ops.isNotEmpty() && ops.first() != "(") {
                 output += ops.removeFirst()
@@ -499,16 +572,13 @@ private fun toRPN(expr: String): List<String> {
             i++
             continue
         }
-
         // Operadores: +, -, *, /, ^, %
         if (c in listOf('+', '-', '*', '/', '^', '%')) {
             val op = c.toString()
-
-            // Determinar “-” unario
+            // Determinar si es “-” unario
             val isUnaryMinus = (c == '-') && (i == 0 ||
                     expr[i - 1] == '(' ||
                     expr[i - 1] in listOf('+', '-', '*', '/', '^'))
-
             if (isUnaryMinus) {
                 while (ops.isNotEmpty() && precedence(ops.first()) >= precedence("u-")) {
                     output += ops.removeFirst()
@@ -517,7 +587,6 @@ private fun toRPN(expr: String): List<String> {
                 i++
                 continue
             }
-
             // Operador binario normal
             while (ops.isNotEmpty()) {
                 val top = ops.first()
@@ -535,10 +604,8 @@ private fun toRPN(expr: String): List<String> {
             i++
             continue
         }
-
         throw IllegalArgumentException("Invalid character at $i: '$c'")
     }
-
     while (ops.isNotEmpty()) {
         val x = ops.removeFirst()
         if (x == "(" || x == ")") {
@@ -546,14 +613,12 @@ private fun toRPN(expr: String): List<String> {
         }
         output += x
     }
-
     return output
 }
 
-// 4) evalRPN: recorre los tokens RPN y calcula el valor final
+// 4) Evalúa la lista de tokens RPN y devuelve un Double
 private fun evalRPN(tokens: List<String>): Double {
     val stack = ArrayDeque<Double>()
-
     for (tok in tokens) {
         when {
             tok == "π" -> stack.addFirst(Math.PI)
@@ -572,7 +637,7 @@ private fun evalRPN(tokens: List<String>): Double {
                     "*" -> a * b
                     "/" -> a / b
                     "^" -> a.pow(b)
-                    "%" -> a * (b / 100.0) // como ejemplo “a % b” → a * (b/100)
+                    "%" -> a * (b / 100.0)
                     else -> throw IllegalStateException("Unknown operator $tok")
                 }
                 stack.addFirst(res)
@@ -592,17 +657,14 @@ private fun evalRPN(tokens: List<String>): Double {
                 stack.addFirst(res)
             }
             else -> {
-                // token es un literal numérico
                 val num = tok.toDoubleOrNull()
                     ?: throw IllegalArgumentException("Invalid token: $tok")
                 stack.addFirst(num)
             }
         }
     }
-
     if (stack.size != 1) {
         throw IllegalArgumentException("Invalid expression: stack = $stack")
     }
-
     return stack.first()
 }
