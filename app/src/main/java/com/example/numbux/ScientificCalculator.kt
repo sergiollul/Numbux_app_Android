@@ -185,9 +185,9 @@ fun ScientificCalculator() {
                                     onClick            = { showPiMenu = true },
                                     interactionSource  = interactionSource,
                                     modifier           = Modifier.fillMaxSize(),
-                                    colors             = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                        contentColor   = LocalContentColor.current
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFFA6A6A6),
+                                        contentColor   = Color.White
                                     )
                                 ) {
                                     Text(
