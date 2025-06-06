@@ -400,6 +400,7 @@ private fun evaluateExpression(exprInput: String): String {
             .replace("−", "-")
             .replace("√", "sqrt")
             .replace("xʸ", "^")
+            .replace("%", "/100")
             .trim()
 
         // 2.b Balanceas paréntesis: si falta un “)” al final, se agrega aquí
