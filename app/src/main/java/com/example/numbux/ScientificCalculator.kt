@@ -265,51 +265,76 @@ fun ScientificCalculator() {
                                     )
                                 }
                             }
-                        } else if (label == "( )") {
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .aspectRatio(1f)
-                                    .padding(3.dp)
-                                    .clip(CircleShape)                     // Recorta a círculo
-                                    .background(Color(0xFF2D2D2F))         // Color de fondo
-                                    .pointerInput(Unit) {                  // Tap corto / largo
-                                        detectTapGestures(
-                                            onTap = {
-                                                val text = fieldValue.text
-                                                val sel  = fieldValue.selection.start
-                                                val countOpen  = text.count { it == '(' }
-                                                val countClose = text.count { it == ')' }
-                                                val toInsert = if (countOpen > countClose) ")" else "("
-                                                val newText = buildString {
-                                                    append(text.take(sel))
-                                                    append(toInsert)
-                                                    append(text.drop(sel))
+                        } else // … dentro de row.forEach { label -> … }
+                            if (label == "( )") {
+                                // Estado local que indica si estamos presionando el botón
+                                var isPressed by remember { mutableStateOf(false) }
+
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .aspectRatio(1f)
+                                        .padding(3.dp)
+                                        // ① Forma circular + fondo
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF2D2D2F))
+                                        // ② Detectamos gestos con pointerInput y actualizamos “isPressed”
+                                        .pointerInput(Unit) {
+                                            detectTapGestures(
+                                                onPress = { offset ->
+                                                    // Empieza la pulsación: marcamos isPressed = true
+                                                    isPressed = true
+
+                                                    // Esperamos a que suelten (o cancelen el gesto)
+                                                    try {
+                                                        // awaitRelease() se suspende hasta el “up” o cancelación
+                                                        awaitRelease()
+                                                        // Si llegamos aquí, fue un tap corto (no se deslizó fuera)
+                                                        // Lógica de insertar “(” o “)”
+                                                        val text = fieldValue.text
+                                                        val sel  = fieldValue.selection.start
+                                                        val countOpen  = text.count { it == '(' }
+                                                        val countClose = text.count { it == ')' }
+                                                        val toInsert = if (countOpen > countClose) ")" else "("
+
+                                                        val newText = buildString {
+                                                            append(text.take(sel))
+                                                            append(toInsert)
+                                                            append(text.drop(sel))
+                                                        }
+                                                        fieldValue = TextFieldValue(newText, TextRange(sel + 1))
+                                                    } finally {
+                                                        // En cuanto levanten (o el gesto sea cancelado), volvemos a false
+                                                        isPressed = false
+                                                    }
+                                                },
+                                                onLongPress = {
+                                                    // Si se detecta “long press”, insertamos siempre “(”
+                                                    val text = fieldValue.text
+                                                    val sel  = fieldValue.selection.start
+                                                    val newText = buildString {
+                                                        append(text.take(sel))
+                                                        append("(")
+                                                        append(text.drop(sel))
+                                                    }
+                                                    fieldValue = TextFieldValue(newText, TextRange(sel + 1))
                                                 }
-                                                fieldValue = TextFieldValue(newText, TextRange(sel + 1))
-                                            },
-                                            onLongPress = {
-                                                val text = fieldValue.text
-                                                val sel  = fieldValue.selection.start
-                                                val newText = buildString {
-                                                    append(text.take(sel))
-                                                    append("(")
-                                                    append(text.drop(sel))
-                                                }
-                                                fieldValue = TextFieldValue(newText, TextRange(sel + 1))
-                                            }
-                                        )
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text       = "( )",
-                                    fontSize   = 26.sp,
-                                    fontWeight = FontWeight.Light,
-                                    color      = Color.White
-                                )
+                                            )
+                                        }
+                                    ,
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    // ③ Solo el texto se anima: scale según isPressed
+                                    Text(
+                                        text       = "( )",
+                                        fontSize   = 26.sp,
+                                        fontWeight = FontWeight.Light,
+                                        color      = Color.White,
+                                        modifier   = Modifier.scale(if (isPressed) 0.6f else 1f)
+                                    )
+                                }
                             }
-                        } else if (label == "log") {
+                            else if (label == "log") {
                             Button(
                                 onClick = {
                                     val sel = fieldValue.selection.start
@@ -325,7 +350,7 @@ fun ScientificCalculator() {
                                     .weight(1f)
                                     .aspectRatio(1f)
                                     .padding(3.dp),
-                                // ← Solo aquí quitamos el contentPadding por completo:
+                                // Quitamos padding interno para dar espacio al texto grande:
                                 contentPadding = PaddingValues(0.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = when {
@@ -357,18 +382,19 @@ fun ScientificCalculator() {
                                     val heightDp = this.maxHeight
                                     val density  = LocalDensity.current
 
-                                    // Tomamos casi todo el alto disponible:
+                                    // Ajusta el factor para que “log” quede del tamaño deseado:
                                     val fontSizeSp = with(density) {
-                                        (heightDp * 0.38f).toSp()
+                                        (heightDp * 0.38f).toSp() // por ejemplo 70% del alto
                                     }
 
+                                    // ① Solo el Text lleva scaleFactor:
                                     Text(
                                         text       = "log",
                                         fontSize   = fontSizeSp,
                                         fontWeight = FontWeight.Normal,
                                         textAlign  = TextAlign.Center,
                                         maxLines   = 1,
-                                        //modifier   = Modifier.offset(y = (-2).dp) // opcional: empuja la "g" un poco hacia arriba
+                                        modifier   = Modifier.scale(scaleFactor)
                                     )
                                 }
                             }
