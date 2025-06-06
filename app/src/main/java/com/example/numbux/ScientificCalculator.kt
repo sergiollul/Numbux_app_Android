@@ -375,9 +375,25 @@ fun ScientificCalculator() {
 
 // ─── Evaluador de expresiones (Shunting‐Yard completo) ─────────────────────
 
-// 1) evaluateExpression: normaliza símbolos y llama a toRPN + evalRPN
+// 1) Función que cierra todos los paréntesis abiertos
+private fun balanceParentheses(input: String): String {
+    var openCount = 0
+    for (ch in input) {
+        if (ch == '(') openCount++
+        else if (ch == ')') openCount--
+    }
+    // Si openCount > 0, faltan tantos ‘)’ al final
+    return if (openCount > 0) {
+        input + ")".repeat(openCount)
+    } else {
+        input
+    }
+}
+
+// 2) evaluateExpression modificado para “auto‐cerrar” paréntesis
 private fun evaluateExpression(exprInput: String): String {
     return try {
+        // 2.a Normalizas símbolos especiales (√ → sqrt, × → *, ÷ → /, − → - …)
         var expr = exprInput
             .replace("×", "*")
             .replace("÷", "/")
@@ -386,9 +402,14 @@ private fun evaluateExpression(exprInput: String): String {
             .replace("xʸ", "^")
             .trim()
 
+        // 2.b Balanceas paréntesis: si falta un “)” al final, se agrega aquí
+        expr = balanceParentheses(expr)
+
+        // 2.c Llamas al resto de la lógica de RPN
         val rpnValue = toRPN(expr)
         val result   = evalRPN(rpnValue)
 
+        // 2.d Formateas el resultado (sin “.0” si es entero)
         if (result.isInfinite() || result.isNaN()) {
             "Error"
         } else {
@@ -403,7 +424,8 @@ private fun evaluateExpression(exprInput: String): String {
     }
 }
 
-// 2) toRPN: convierte la cadena infija en tokens RPN
+
+// 3) toRPN: convierte la cadena infija en tokens RPN
 private fun toRPN(expr: String): List<String> {
     val output = mutableListOf<String>()
     val ops = ArrayDeque<String>()
@@ -527,7 +549,7 @@ private fun toRPN(expr: String): List<String> {
     return output
 }
 
-// 3) evalRPN: recorre los tokens RPN y calcula el valor final
+// 4) evalRPN: recorre los tokens RPN y calcula el valor final
 private fun evalRPN(tokens: List<String>): Double {
     val stack = ArrayDeque<Double>()
 
@@ -583,4 +605,3 @@ private fun evalRPN(tokens: List<String>): Double {
 
     return stack.first()
 }
-
