@@ -188,21 +188,55 @@ fun BasicCalculator() {
                                         fieldValue = TextFieldValue(newText, TextRange(sel + 1))
                                     }
                                     "+/-" -> {
-                                        // Toggle sign of the whole expression
-                                        val text = fieldValue.text
-                                        val sel  = fieldValue.selection.start
-                                        if (text.startsWith("-")) {
-                                            // remove leading “-”
-                                            val newText = text.removePrefix("-")
-                                            // move caret back by 1 (but not below 0)
-                                            val newSel = (sel - 1).coerceAtLeast(0)
-                                            fieldValue = TextFieldValue(newText, TextRange(newSel))
-                                        } else {
-                                            // add leading “-”
-                                            val newText = "-$text"
-                                            // move caret forward by 1
-                                            fieldValue = TextFieldValue(newText, TextRange(sel + 1))
+                                        val text   = fieldValue.text
+                                        val cursor = fieldValue.selection.start
+
+                                        // 1) Encontrar el índice de inicio del número donde está el cursor:
+                                        var startIndex = cursor
+                                        while (startIndex > 0 && (text[startIndex - 1].isDigit() || text[startIndex - 1] == '.')) {
+                                            startIndex--
                                         }
+
+                                        // 2) Encontrar el índice de fin de ese mismo número:
+                                        var endIndex = cursor
+                                        while (endIndex < text.length && (text[endIndex].isDigit() || text[endIndex] == '.')) {
+                                            endIndex++
+                                        }
+
+                                        // 3) Comprobar si justo antes de startIndex hay un signo “-” que actúe como unario:
+                                        //    Debe ser un “-” y, o bien estar en la posición 0, o bien el carácter anterior
+                                        //    a ese “-” es un operador o paréntesis izquierdo, para asegurarnos de que es un “-” unario.
+                                        val hasMinus = startIndex > 0 && text[startIndex - 1] == '-'
+                                        val isUnaryMinus = if (hasMinus) {
+                                            // Si está en posición 1 (startIndex-1 == 0), es un “-” unario en el comienzo
+                                            if (startIndex - 1 == 0) true
+                                            else {
+                                                // Si el carácter anterior a ese “-” es uno de los operadores o “(”
+                                                val prev = text[startIndex - 2]
+                                                prev in listOf('+', '−', '×', '÷', '*', '/', '^', '(', '%')
+                                            }
+                                        } else {
+                                            false
+                                        }
+
+                                        val newText: String
+                                        val newCursor: Int
+
+                                        if (isUnaryMinus) {
+                                            // 4.a) Si ya había un “-” unario, lo quitamos:
+                                            newText = text.removeRange(startIndex - 1, startIndex)
+                                            newCursor = cursor - 1
+                                        } else {
+                                            // 4.b) Si no había un “-” unario, lo insertamos antes del número:
+                                            newText = buildString {
+                                                append(text.take(startIndex))
+                                                append("-")
+                                                append(text.drop(startIndex))
+                                            }
+                                            newCursor = cursor + 1
+                                        }
+
+                                        fieldValue = TextFieldValue(newText, TextRange(newCursor))
                                     }
                                     "=" -> {
                                         val expr = fieldValue.text
