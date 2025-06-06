@@ -265,76 +265,80 @@ fun ScientificCalculator() {
                                     )
                                 }
                             }
-                        } else // … dentro de row.forEach { label -> … }
-                            if (label == "( )") {
-                                // Estado local que indica si estamos presionando el botón
-                                var isPressed by remember { mutableStateOf(false) }
+                        } else if (label == "( )") {
+                            // ① Estado para detectar si ha ocurrido un long press
+                            var isPressed by remember { mutableStateOf(false) }
+                            var didLongPress by remember { mutableStateOf(false) }
 
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .aspectRatio(1f)
-                                        .padding(3.dp)
-                                        // ① Forma circular + fondo
-                                        .clip(CircleShape)
-                                        .background(Color(0xFF2D2D2F))
-                                        // ② Detectamos gestos con pointerInput y actualizamos “isPressed”
-                                        .pointerInput(Unit) {
-                                            detectTapGestures(
-                                                onPress = { offset ->
-                                                    // Empieza la pulsación: marcamos isPressed = true
-                                                    isPressed = true
-
-                                                    // Esperamos a que suelten (o cancelen el gesto)
-                                                    try {
-                                                        // awaitRelease() se suspende hasta el “up” o cancelación
-                                                        awaitRelease()
-                                                        // Si llegamos aquí, fue un tap corto (no se deslizó fuera)
-                                                        // Lógica de insertar “(” o “)”
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .aspectRatio(1f)
+                                    .padding(3.dp)
+                                    // Forma circular + fondo
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF2D2D2F))
+                                    // ② PointerInput que gestiona tanto onPress como onLongPress
+                                    .pointerInput(Unit) {
+                                        detectTapGestures(
+                                            onPress = {
+                                                // Marcamos que estamos presionando
+                                                isPressed = true
+                                                try {
+                                                    // Esperamos a que suelten el dedo (o cancelen)
+                                                    awaitRelease()
+                                                    // Solo si NO hubo longPress, hacemos el toggle de “(” / “)”
+                                                    if (!didLongPress) {
                                                         val text = fieldValue.text
-                                                        val sel  = fieldValue.selection.start
-                                                        val countOpen  = text.count { it == '(' }
+                                                        val sel = fieldValue.selection.start
+                                                        val countOpen = text.count { it == '(' }
                                                         val countClose = text.count { it == ')' }
-                                                        val toInsert = if (countOpen > countClose) ")" else "("
+                                                        val toInsert =
+                                                            if (countOpen > countClose) ")" else "("
 
                                                         val newText = buildString {
                                                             append(text.take(sel))
                                                             append(toInsert)
                                                             append(text.drop(sel))
                                                         }
-                                                        fieldValue = TextFieldValue(newText, TextRange(sel + 1))
-                                                    } finally {
-                                                        // En cuanto levanten (o el gesto sea cancelado), volvemos a false
-                                                        isPressed = false
+                                                        fieldValue = TextFieldValue(
+                                                            newText,
+                                                            TextRange(sel + 1)
+                                                        )
                                                     }
-                                                },
-                                                onLongPress = {
-                                                    // Si se detecta “long press”, insertamos siempre “(”
-                                                    val text = fieldValue.text
-                                                    val sel  = fieldValue.selection.start
-                                                    val newText = buildString {
-                                                        append(text.take(sel))
-                                                        append("(")
-                                                        append(text.drop(sel))
-                                                    }
-                                                    fieldValue = TextFieldValue(newText, TextRange(sel + 1))
+                                                } finally {
+                                                    // Al terminar (up o cancel), reseteamos ambos flags
+                                                    isPressed = false
+                                                    didLongPress = false
                                                 }
-                                            )
-                                        }
-                                    ,
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    // ③ Solo el texto se anima: scale según isPressed
-                                    Text(
-                                        text       = "( )",
-                                        fontSize   = 26.sp,
-                                        fontWeight = FontWeight.Light,
-                                        color      = Color.White,
-                                        modifier   = Modifier.scale(if (isPressed) 0.6f else 1f)
-                                    )
-                                }
+                                            },
+                                            onLongPress = {
+                                                // Cuando ocurre long press, insertamos siempre “(”
+                                                didLongPress = true
+                                                val text = fieldValue.text
+                                                val sel = fieldValue.selection.start
+                                                val newText = buildString {
+                                                    append(text.take(sel))
+                                                    append("(")
+                                                    append(text.drop(sel))
+                                                }
+                                                fieldValue =
+                                                    TextFieldValue(newText, TextRange(sel + 1))
+                                            }
+                                        )
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                // ③ Solo escalamos el texto según “isPressed”
+                                Text(
+                                    text = "( )",
+                                    fontSize = 26.sp,
+                                    fontWeight = FontWeight.Light,
+                                    color = Color.White,
+                                    modifier = Modifier.scale(if (isPressed) 0.6f else 1f)
+                                )
                             }
-                            else if (label == "log") {
+                        }else if (label == "log") {
                             Button(
                                 onClick = {
                                     val sel = fieldValue.selection.start
