@@ -40,20 +40,19 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlin.math.*
+
 
 @Composable
 fun ScientificCalculator() {
-    // -------------- ESTADOS --------------
     var fieldValue by remember { mutableStateOf(TextFieldValue(text = "", selection = TextRange(0))) }
-    var result     by remember { mutableStateOf("") }
     var showPiMenu by remember { mutableStateOf(false) }
 
-    // Para gestionar el cursor en el BasicTextField
+    // Para gestionar el foco en el BasicTextField
     val textFieldInteraction = remember { MutableInteractionSource() }
     val focusRequester       = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
-        // Pequeño retraso para que Compose termine de “layoutear” y podamos solicitar foco
         delay(100)
         focusRequester.requestFocus()
         textFieldInteraction.tryEmit(FocusInteraction.Focus())
@@ -65,7 +64,7 @@ fun ScientificCalculator() {
             .padding(16.dp),
         verticalArrangement = Arrangement.Top
     ) {
-        // ─── 1) BASIC TEXT FIELD ───────────────────────────────────────────
+        // ─── BASIC TEXT FIELD ──────────────────────────────────────────────
         BasicTextField(
             value             = fieldValue,
             onValueChange     = { fieldValue = it },
@@ -82,7 +81,6 @@ fun ScientificCalculator() {
                 .focusable(interactionSource = textFieldInteraction)
                 .focusRequester(focusRequester),
             decorationBox = { inner ->
-                // Alineamos el texto y el cursor a la derecha
                 Box(
                     modifier         = Modifier.fillMaxWidth(),
                     contentAlignment = Alignment.CenterEnd
@@ -92,7 +90,7 @@ fun ScientificCalculator() {
             }
         )
 
-        // ─── 2) BOTÓN BACKSPACE ────────────────────────────────────────────
+        // ─── BACKSPACE ─────────────────────────────────────────────────────
         Row(
             modifier             = Modifier
                 .fillMaxWidth()
@@ -129,7 +127,7 @@ fun ScientificCalculator() {
         )
         Spacer(modifier = Modifier.height(30.dp))
 
-        // ─── 3) GRID DE BOTONES ────────────────────────────────────────────
+        // ─── GRID DE BOTONES ───────────────────────────────────────────────
         Column(
             modifier            = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -152,16 +150,15 @@ fun ScientificCalculator() {
                     verticalAlignment     = Alignment.CenterVertically
                 ) {
                     row.forEach { label ->
-                        // Para el efecto de “botón presionado”
                         val interactionSource = remember { MutableInteractionSource() }
                         val isPressed by interactionSource.collectIsPressedAsState()
                         val scaleFactor by animateFloatAsState(if (isPressed) 0.6f else 1f)
 
                         if (label == "π-e") {
-                            // ─────────────────────────── BOTÓN π-e + DROPDOWN ───────────────────────────
+                            // ─── BOTÓN π-e + DROPDOWN ───────────────────────────────
                             Box(
                                 modifier = Modifier
-                                    .weight(1f)         // sigue en RowScope
+                                    .weight(1f)
                                     .aspectRatio(1f)
                                     .padding(3.dp)
                             ) {
@@ -175,15 +172,14 @@ fun ScientificCalculator() {
                                     )
                                 ) {
                                     Text(
-                                        text         = "π-e",
-                                        fontSize     = 34.sp,
-                                        fontWeight   = FontWeight.Medium,
-                                        fontFamily   = MaterialTheme.typography.titleLarge.fontFamily,
-                                        modifier     = Modifier.scale(scaleFactor)
+                                        text       = "π-e",
+                                        fontSize   = 34.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        fontFamily = MaterialTheme.typography.titleLarge.fontFamily,
+                                        modifier   = Modifier.scale(scaleFactor)
                                     )
                                 }
 
-                                // El “pequeño window” es un DropdownMenu que se cierra al tocar fuera
                                 DropdownMenu(
                                     expanded         = showPiMenu,
                                     onDismissRequest = { showPiMenu = false }
@@ -213,8 +209,8 @@ fun ScientificCalculator() {
                                         onClick = {
                                             val sel = fieldValue.selection.start
                                             val newText =
-                                                fieldValue.text.take(sel) + "e" + fieldValue.text.drop(sel)
-                                            fieldValue = TextFieldValue(newText, TextRange(sel + 1))
+                                                fieldValue.text.take(sel) + "ln(" + fieldValue.text.drop(sel)
+                                            fieldValue = TextFieldValue(newText, TextRange(sel + 3))
                                             showPiMenu = false
                                         }
                                     )
@@ -223,8 +219,8 @@ fun ScientificCalculator() {
                                         onClick = {
                                             val sel = fieldValue.selection.start
                                             val newText =
-                                                fieldValue.text.take(sel) + "e" + fieldValue.text.drop(sel)
-                                            fieldValue = TextFieldValue(newText, TextRange(sel + 1))
+                                                fieldValue.text.take(sel) + "sin(" + fieldValue.text.drop(sel)
+                                            fieldValue = TextFieldValue(newText, TextRange(sel + 4))
                                             showPiMenu = false
                                         }
                                     )
@@ -233,8 +229,8 @@ fun ScientificCalculator() {
                                         onClick = {
                                             val sel = fieldValue.selection.start
                                             val newText =
-                                                fieldValue.text.take(sel) + "e" + fieldValue.text.drop(sel)
-                                            fieldValue = TextFieldValue(newText, TextRange(sel + 1))
+                                                fieldValue.text.take(sel) + "cos(" + fieldValue.text.drop(sel)
+                                            fieldValue = TextFieldValue(newText, TextRange(sel + 4))
                                             showPiMenu = false
                                         }
                                     )
@@ -243,15 +239,15 @@ fun ScientificCalculator() {
                                         onClick = {
                                             val sel = fieldValue.selection.start
                                             val newText =
-                                                fieldValue.text.take(sel) + "e" + fieldValue.text.drop(sel)
-                                            fieldValue = TextFieldValue(newText, TextRange(sel + 1))
+                                                fieldValue.text.take(sel) + "tan(" + fieldValue.text.drop(sel)
+                                            fieldValue = TextFieldValue(newText, TextRange(sel + 4))
                                             showPiMenu = false
                                         }
                                     )
                                 }
                             }
                         } else {
-                            // ───────────────────────────── BOTONES “NORMALES” ──────────────────────────
+                            // ─── BOTONES NORMALES ─────────────────────────────────
                             Button(
                                 onClick = {
                                     when (label) {
@@ -261,7 +257,7 @@ fun ScientificCalculator() {
                                         "( )" -> {
                                             val text = fieldValue.text
                                             val sel  = fieldValue.selection.start
-                                            val toInsert = if (!text.contains("(")) "(" else ")"
+                                            val toInsert = "("  // simplemente inserta “(”
                                             val newText = buildString {
                                                 append(text.take(sel))
                                                 append(toInsert)
@@ -282,28 +278,43 @@ fun ScientificCalculator() {
                                             }
                                         }
                                         "=" -> {
+                                            // Reemplaza “×”/“÷”/“−”/“xʸ” en evaluateExpression
                                             val expr = fieldValue.text
-                                                .replace("×", "*")
-                                                .replace("÷", "/")
-                                                .replace("−", "-")
                                             val res = evaluateExpression(expr)
                                             fieldValue = TextFieldValue(res, TextRange(res.length))
                                         }
                                         else -> {
-                                            // Inserta dígito u operador en la posición actual del cursor
-                                            if (result.isNotEmpty() && label.matches(Regex("[0-9.]"))) {
-                                                // Si venimos de un resultado, empezamos un número nuevo
-                                                fieldValue = TextFieldValue(label, TextRange(1))
-                                                result     = ""
+                                            // Inserta dígito u operador (cubre “%”, “÷”, “×”, “−”, “+”, “.”, dígitos)
+                                            if (label == "xʸ") {
+                                                // inserta “^” en vez de la flecha
+                                                val sel = fieldValue.selection.start
+                                                val newText = buildString {
+                                                    append(fieldValue.text.take(sel))
+                                                    append("^")
+                                                    append(fieldValue.text.drop(sel))
+                                                }
+                                                fieldValue = TextFieldValue(newText, TextRange(sel + 1))
+                                            } else if (label == "√") {
+                                                // inserta “√(” para que el parser lo convierta a “sqrt(”
+                                                val sel = fieldValue.selection.start
+                                                val newText = buildString {
+                                                    append(fieldValue.text.take(sel))
+                                                    append("√(")
+                                                    append(fieldValue.text.drop(sel))
+                                                }
+                                                fieldValue = TextFieldValue(newText, TextRange(sel + 2))
                                             } else {
+                                                // caso normal: números y {%, ÷, ×, −, +, .}
                                                 val sel = fieldValue.selection.start
                                                 val newText = buildString {
                                                     append(fieldValue.text.take(sel))
                                                     append(label)
                                                     append(fieldValue.text.drop(sel))
                                                 }
-                                                fieldValue =
-                                                    TextFieldValue(newText, TextRange(sel + label.length))
+                                                fieldValue = TextFieldValue(
+                                                    newText,
+                                                    TextRange(sel + label.length)
+                                                )
                                             }
                                         }
                                     }
@@ -336,7 +347,6 @@ fun ScientificCalculator() {
                                     }
                                 )
                             ) {
-                                // Tamaño y peso de fuente según etiqueta, recuperando el comportamiento original
                                 val (fontSize, fontWeight) = when (label) {
                                     "+/-" -> 16.sp to FontWeight.Light
                                     "C", "( )" -> 26.sp to FontWeight.Light
@@ -344,9 +354,8 @@ fun ScientificCalculator() {
                                     "÷", "×", "+" -> 46.sp to FontWeight.Light
                                     "−" -> 60.sp to FontWeight.Light
                                     "=" -> 56.sp to FontWeight.Light
-                                    else -> 34.sp to FontWeight.Medium  // incluye dígitos 1–9 y "."
+                                    else -> 34.sp to FontWeight.Medium
                                 }
-
                                 Text(
                                     text       = label,
                                     fontSize   = fontSize,
@@ -363,74 +372,215 @@ fun ScientificCalculator() {
     }
 }
 
-// ─── Evaluador de expresiones (Shunting‐Yard) ─────────────────────────────
-private fun evaluateExpression(expr: String): String {
+
+// ─── Evaluador de expresiones (Shunting‐Yard completo) ─────────────────────
+
+// 1) evaluateExpression: normaliza símbolos y llama a toRPN + evalRPN
+private fun evaluateExpression(exprInput: String): String {
     return try {
-        val rpn   = toRPN(expr)
-        val value = evalRPN(rpn)
-        if (value % 1.0 == 0.0) value.toLong().toString() else value.toString()
+        var expr = exprInput
+            .replace("×", "*")
+            .replace("÷", "/")
+            .replace("−", "-")
+            .replace("√", "sqrt")
+            .replace("xʸ", "^")
+            .trim()
+
+        val rpnValue = toRPN(expr)
+        val result   = evalRPN(rpnValue)
+
+        if (result.isInfinite() || result.isNaN()) {
+            "Error"
+        } else {
+            if (result % 1.0 == 0.0) {
+                result.toLong().toString()
+            } else {
+                result.toString().trimEnd('0').trimEnd('.')
+            }
+        }
     } catch (_: Exception) {
         "Error"
     }
 }
 
+// 2) toRPN: convierte la cadena infija en tokens RPN
 private fun toRPN(expr: String): List<String> {
     val output = mutableListOf<String>()
-    val ops    = ArrayDeque<Char>()
-    var i      = 0
+    val ops = ArrayDeque<String>()
+
+    fun precedence(op: String): Int = when (op) {
+        "sin", "cos", "tan", "log", "ln", "sqrt" -> 5
+        "^"   -> 4
+        "*", "/", "%" -> 3
+        "+", "-" -> 2
+        else    -> 0
+    }
+
+    fun isLeftAssociative(op: String): Boolean = when (op) {
+        "^" -> false
+        else -> true
+    }
+
+    var i = 0
     while (i < expr.length) {
-        when (val c = expr[i]) {
-            in '0'..'9', '.' -> {
-                val start = i
-                while (i < expr.length && (expr[i].isDigit() || expr[i] == '.')) i++
-                output += expr.substring(start, i)
+        val c = expr[i]
+
+        if (c.isWhitespace()) {
+            i++
+            continue
+        }
+
+        // Números
+        if (c.isDigit() || c == '.') {
+            val start = i
+            while (i < expr.length && (expr[i].isDigit() || expr[i] == '.')) {
+                i++
+            }
+            output += expr.substring(start, i)
+            continue
+        }
+
+        // Funciones o constantes
+        if (c.isLetter() || c == 'π' || c == 'e') {
+            val start = i
+            while (i < expr.length && (expr[i].isLetter() || expr[i] == 'π' || expr[i] == 'e')) {
+                i++
+            }
+            val token = expr.substring(start, i)
+            when (token) {
+                "π", "e" -> output += token
+                "sqrt", "sin", "cos", "tan", "log", "ln" -> ops.addFirst(token)
+                else -> throw IllegalArgumentException("Unknown token: $token")
+            }
+            continue
+        }
+
+        // Paréntesis abriendo
+        if (c == '(') {
+            ops.addFirst("(")
+            i++
+            continue
+        }
+
+        // Paréntesis cerrando
+        if (c == ')') {
+            while (ops.isNotEmpty() && ops.first() != "(") {
+                output += ops.removeFirst()
+            }
+            if (ops.isNotEmpty() && ops.first() == "(") {
+                ops.removeFirst()
+            }
+            if (ops.isNotEmpty() && ops.first() in setOf("sin", "cos", "tan", "log", "ln", "sqrt")) {
+                output += ops.removeFirst()
+            }
+            i++
+            continue
+        }
+
+        // Operadores: +, -, *, /, ^, %
+        if (c in listOf('+', '-', '*', '/', '^', '%')) {
+            val op = c.toString()
+
+            // Determinar “-” unario
+            val isUnaryMinus = (c == '-') && (i == 0 ||
+                    expr[i - 1] == '(' ||
+                    expr[i - 1] in listOf('+', '-', '*', '/', '^'))
+
+            if (isUnaryMinus) {
+                while (ops.isNotEmpty() && precedence(ops.first()) >= precedence("u-")) {
+                    output += ops.removeFirst()
+                }
+                ops.addFirst("u-")
+                i++
                 continue
             }
-            '+', '-', '*', '/' -> {
-                while (ops.isNotEmpty() && precedence(ops.first()) >= precedence(c)) {
-                    output += ops.removeFirst().toString()
+
+            // Operador binario normal
+            while (ops.isNotEmpty()) {
+                val top = ops.first()
+                if ((top in setOf("+", "-", "*", "/", "^", "%")) &&
+                    ( precedence(top) > precedence(op) ||
+                            (precedence(top) == precedence(op) && isLeftAssociative(op))
+                            )
+                ) {
+                    output += ops.removeFirst()
+                    continue
                 }
-                ops.addFirst(c)
+                break
             }
+            ops.addFirst(op)
+            i++
+            continue
         }
-        i++
+
+        throw IllegalArgumentException("Invalid character at $i: '$c'")
     }
-    while (ops.isNotEmpty()) output += ops.removeFirst().toString()
+
+    while (ops.isNotEmpty()) {
+        val x = ops.removeFirst()
+        if (x == "(" || x == ")") {
+            throw IllegalArgumentException("Mismatched parentheses")
+        }
+        output += x
+    }
+
     return output
 }
 
+// 3) evalRPN: recorre los tokens RPN y calcula el valor final
 private fun evalRPN(tokens: List<String>): Double {
     val stack = ArrayDeque<Double>()
+
     for (tok in tokens) {
-        when (tok) {
-            "+" -> {
+        when {
+            tok == "π" -> stack.addFirst(Math.PI)
+            tok == "e" -> stack.addFirst(Math.E)
+            tok == "u-" -> {
+                val x = stack.removeFirst()
+                stack.addFirst(-x)
+            }
+            tok in setOf("+", "-", "*", "/", "^", "%") -> {
+                require(stack.size >= 2) { "Not enough operands for $tok" }
                 val b = stack.removeFirst()
                 val a = stack.removeFirst()
-                stack.addFirst(a + b)
+                val res = when (tok) {
+                    "+" -> a + b
+                    "-" -> a - b
+                    "*" -> a * b
+                    "/" -> a / b
+                    "^" -> a.pow(b)
+                    "%" -> a * (b / 100.0) // como ejemplo “a % b” → a * (b/100)
+                    else -> throw IllegalStateException("Unknown operator $tok")
+                }
+                stack.addFirst(res)
             }
-            "-" -> {
-                val b = stack.removeFirst()
-                val a = stack.removeFirst()
-                stack.addFirst(a - b)
+            tok in setOf("sin", "cos", "tan", "log", "ln", "sqrt") -> {
+                require(stack.isNotEmpty()) { "No argument for function $tok" }
+                val x = stack.removeFirst()
+                val res = when (tok) {
+                    "sin"  -> sin(x)
+                    "cos"  -> cos(x)
+                    "tan"  -> tan(x)
+                    "log"  -> log10(x)
+                    "ln"   -> ln(x)
+                    "sqrt" -> sqrt(x)
+                    else   -> throw IllegalStateException("Unknown function $tok")
+                }
+                stack.addFirst(res)
             }
-            "*" -> {
-                val b = stack.removeFirst()
-                val a = stack.removeFirst()
-                stack.addFirst(a * b)
+            else -> {
+                // token es un literal numérico
+                val num = tok.toDoubleOrNull()
+                    ?: throw IllegalArgumentException("Invalid token: $tok")
+                stack.addFirst(num)
             }
-            "/" -> {
-                val b = stack.removeFirst()
-                val a = stack.removeFirst()
-                stack.addFirst(a / b)
-            }
-            else -> stack.addFirst(tok.toDouble())
         }
     }
+
+    if (stack.size != 1) {
+        throw IllegalArgumentException("Invalid expression: stack = $stack")
+    }
+
     return stack.first()
 }
 
-private fun precedence(op: Char): Int = when (op) {
-    '+', '-' -> 1
-    '*', '/' -> 2
-    else     -> 0
-}
