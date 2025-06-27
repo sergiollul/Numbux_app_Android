@@ -102,6 +102,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.unit.dp
+import androidx.activity.result.ActivityResultLauncher
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -179,6 +180,7 @@ class MainActivity : ComponentActivity() {
     private var lastInternalWallpaperChange: Long = 0L
     private var hasShownBackupExplanation = false
     private var showBackupDialog by mutableStateOf(false)
+    private lateinit var accessibilityLauncher: ActivityResultLauncher<Intent>
 
     private var backupHomeUri: Uri?
         get() = prefs.getString("backup_home_uri", null)?.let(Uri::parse)
@@ -218,6 +220,16 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        accessibilityLauncher = registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { _ ->
+            // Called as soon as the user returns from Accessibility Settings
+            if (isAccessibilityServiceEnabled(this)) {
+                accessibilityDialog?.dismiss()
+                accessibilityDialog = null
+            }
+        }
         prefs = PreferenceManager.getDefaultSharedPreferences(this)
         showBackupHomePrompt = mutableStateOf(prefs.getBoolean("backup_home_prompt", false))
         showBackupLockPrompt = mutableStateOf(prefs.getBoolean("backup_lock_prompt", false))
@@ -615,12 +627,16 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         checkForWallpaperChange()
 
-        if (!isAccessibilityServiceEnabled(this) && accessibilityDialog?.isShowing != true) {
-            showEnableAccessibilityDialog()
+        if (!isAccessibilityServiceEnabled(this)) {
+            // service still off → show it if not showing
+            if (accessibilityDialog?.isShowing != true) {
+                showEnableAccessibilityDialog()
+            }
         } else {
+            // service now on → dismiss it immediately
             accessibilityDialog?.dismiss()
+            accessibilityDialog = null
 
-            // 2) Right after dismissing, show your explanation exactly once:
             if (!hasShownBackupExplanation) {
                 showBackupExplanation()
                 hasShownBackupExplanation = true
@@ -683,6 +699,7 @@ class MainActivity : ComponentActivity() {
                         Text(
                             text = "🖼 Restaurar HOME",
                             style = MaterialTheme.typography.labelSmall,
+                            color = androidx.compose.ui.graphics.Color.Black,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             textAlign = TextAlign.Center,
@@ -706,6 +723,7 @@ class MainActivity : ComponentActivity() {
                         Text(
                             text = "🔒 Restaurar LOCK",
                             style = MaterialTheme.typography.labelSmall,
+                            color = androidx.compose.ui.graphics.Color.Black,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             textAlign = TextAlign.Center,
@@ -717,9 +735,9 @@ class MainActivity : ComponentActivity() {
 
                     Text(
                         text = """
-                        Cuando el modo foco esté activado, tu fondo cambiará.
+                        Cuando el modo foco esté activado, tu fondo de pantalla y de bloqueo cambiarán.
                         
-                        Estos botones son para que NumbuX restaure tu fondo una vez el modo foco se desactive.
+                        Estos botones son para que NumbuX restaure tus fondos una vez el modo foco se desactive.
                         
                         Por favor, selecciona tus fondos con estos botones.
                     """.trimIndent(),
@@ -747,6 +765,7 @@ class MainActivity : ComponentActivity() {
     private fun showEnableAccessibilityDialog(){
         val custom=layoutInflater.inflate(R.layout.dialog_enable_accessibility,null,false)
         val dlg=AlertDialog.Builder(this,R.style.NoShadowDialog).setView(custom).setCancelable(false).show()
+        accessibilityDialog = dlg
         dlg.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
         custom.viewTreeObserver.addOnGlobalLayoutListener(object:ViewTreeObserver.OnGlobalLayoutListener{
             override fun onGlobalLayout(){ custom.viewTreeObserver.removeOnGlobalLayoutListener(this)
@@ -758,8 +777,11 @@ class MainActivity : ComponentActivity() {
                     val pad = (16 * resources.displayMetrics.density).toInt()
                     setPadding(pad, pad / 2, pad, pad / 2)
                     setOnClickListener {
-                        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                        accessibilityLauncher.launch(
+                            Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                        )
                         dlg.dismiss()
+                        accessibilityDialog = null
                     }
                     setOnTouchListener { _, event ->
                         when (event.action) {
