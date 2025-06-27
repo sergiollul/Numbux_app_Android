@@ -494,42 +494,58 @@ class MainActivity : ComponentActivity() {
                                 enabled     = enabled
                             )
                         },
+                        // Only calculators live here now
                         bottomBar = {
                             Box(
-                                modifier = Modifier
+                                Modifier
                                     .fillMaxWidth()
-                                    .navigationBarsPadding()  // pushes content above the nav bar
+                                    .navigationBarsPadding()
                             ) {
                                 when (currentPage) {
                                     1 -> BasicCalculator()
                                     2 -> ScientificCalculator()
-                                    3 -> DictionaryBottomBar()
+                                    3 -> {
+                                        // only for the dictionary, add 16.dp above it
+                                        Box(modifier = Modifier.padding(top = 20.dp)) {
+                                            DictionaryBottomBar()
+                                        }
+                                    }
                                 }
                             }
                         }
                     ) { innerPadding ->
                         Column(
-                            modifier = Modifier
+                            Modifier
                                 .fillMaxSize()
                                 .padding(innerPadding)
                                 .padding(24.dp),
                             verticalArrangement = Arrangement.spacedBy(20.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            if (showBackupHomePrompt.value)
+                            // Your “Restaurar” buttons
+                            if (showBackupHomePrompt.value) {
                                 Button({ pickHomeLauncher.launch(arrayOf("image/*")) }) {
                                     Text("🖼 Restaurar HOME")
                                 }
-                            if (showBackupLockPrompt.value)
+                            }
+                            if (showBackupLockPrompt.value) {
                                 Button({ pickLockLauncher.launch(arrayOf("image/*")) }) {
                                     Text("🔒 Restaurar LOCK")
                                 }
+                            }
+
+                            // Now render page 3’s dictionary in the content,
+                            // with its spacer to push it away from the topBar
+                            when (currentPage) {
+                                3 -> {
+                                    Spacer(Modifier.height(16.dp))    // <-- breathing room under the topBar
+                                    DictionaryBottomBar()
+                                }
+                            }
                         }
 
                         if (showBackupDialog) {
-                            BackupExplanationDialog {
-                                showBackupDialog = false
-                            }
+                            BackupExplanationDialog { showBackupDialog = false }
                         }
                     }
                 }
