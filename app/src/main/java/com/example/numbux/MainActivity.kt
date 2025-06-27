@@ -383,6 +383,7 @@ class MainActivity : ComponentActivity() {
                             // ── Push everything above up ──────────────────────────────────────
                             Spacer(modifier = Modifier.weight(1f))
 
+                            val maxPage = 3
                             Row(
                                 modifier = Modifier
                                     .align(Alignment.CenterHorizontally)
@@ -431,8 +432,10 @@ class MainActivity : ComponentActivity() {
                             ) {
                                 IconButton(
                                     onClick = {
-                                        // go back to page 1 (or clamp at 1)
-                                        currentPage = maxOf(1, currentPage - 1)
+                                        // only go back if we’re above page 1
+                                        if (currentPage > 1) {
+                                            currentPage--
+                                        }
                                     }
                                 ) {
                                     Icon(
@@ -449,8 +452,10 @@ class MainActivity : ComponentActivity() {
                                 )
                                 IconButton(
                                     onClick = {
-                                        // advance to page 2 (or whatever your max is)
-                                        currentPage += 1
+                                        // only advance if we haven’t hit maxPage yet
+                                        if (currentPage < maxPage) {
+                                            currentPage++
+                                        }
                                     }
                                 ) {
                                     Icon(
@@ -806,18 +811,18 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 dlg.window
-                ?.decorView
-                ?.findViewById<FrameLayout>(android.R.id.content)
-                ?.let { container ->
-                    val params = FrameLayout.LayoutParams(
-                        FrameLayout.LayoutParams.WRAP_CONTENT,
-                        FrameLayout.LayoutParams.WRAP_CONTENT
-                    ).apply {
-                        gravity = Gravity.CENTER_HORIZONTAL or Gravity.TOP
-                        topMargin = dialogHeightPx + (8 * resources.displayMetrics.density).toInt()
+                    ?.decorView
+                    ?.findViewById<FrameLayout>(android.R.id.content)
+                    ?.let { container ->
+                        val params = FrameLayout.LayoutParams(
+                            FrameLayout.LayoutParams.WRAP_CONTENT,
+                            FrameLayout.LayoutParams.WRAP_CONTENT
+                        ).apply {
+                            gravity = Gravity.CENTER_HORIZONTAL or Gravity.TOP
+                            topMargin = dialogHeightPx + (8 * resources.displayMetrics.density).toInt()
+                        }
+                        container.addView(btn, params)
                     }
-                    container.addView(btn, params)
-                }
             }
         })
     }
@@ -841,5 +846,3 @@ class MainActivity : ComponentActivity() {
         else unregisterReceiver(wallpaperChangedReceiver)
     }
 }
-
-
