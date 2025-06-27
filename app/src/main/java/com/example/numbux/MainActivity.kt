@@ -169,6 +169,7 @@ class MainActivity : ComponentActivity() {
         private const val REQ_OVERLAY = 1001
         private const val KEY_LAST_BACKUP_COLOR_HOME = "last_backup_primary_color_home"
         private const val KEY_LAST_BACKUP_COLOR_LOCK = "last_backup_primary_color_lock"
+        private const val PREF_SHOWN_BACKUP_EXPLANATION = "shown_backup_explanation"
     }
 
     private lateinit var prefs: SharedPreferences
@@ -181,7 +182,9 @@ class MainActivity : ComponentActivity() {
     private lateinit var wallpaperColorsListener: WallpaperManager.OnColorsChangedListener
     private var isInternalWallpaperChange = false
     private var lastInternalWallpaperChange: Long = 0L
-    private var hasShownBackupExplanation = false
+    private var hasShownBackupExplanation: Boolean
+        get() = prefs.getBoolean(PREF_SHOWN_BACKUP_EXPLANATION, false)
+        set(value) = prefs.edit().putBoolean(PREF_SHOWN_BACKUP_EXPLANATION, value).apply()
     private var showBackupDialog by mutableStateOf(false)
     private lateinit var accessibilityLauncher: ActivityResultLauncher<Intent>
 
@@ -674,9 +677,10 @@ class MainActivity : ComponentActivity() {
             accessibilityDialog?.dismiss()
             accessibilityDialog = null
 
+            // Solo si aún **no** lo hemos mostrado y el servicio YA está ON
             if (!hasShownBackupExplanation) {
                 showBackupExplanation()
-                hasShownBackupExplanation = true
+                hasShownBackupExplanation = true   // se persiste en prefs
             }
         }
     }
