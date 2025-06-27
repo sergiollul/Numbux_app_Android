@@ -204,19 +204,29 @@ class MainActivity : ComponentActivity() {
         if (now - lastInternalWallpaperChange < 2_000) return
 
         val wm = WallpaperManager.getInstance(this)
-        val currHome = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1)
-            wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)?.primaryColor?.toArgb() ?: -1
-        else -1
+
+        // Home wallpaper
+        val currHome = wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
+            ?.primaryColor
+            ?.toArgb() ?: -1
         val savedHome = prefs.getInt(KEY_LAST_BACKUP_COLOR_HOME, -1)
 
-        val currLock = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1)
-            wm.getWallpaperColors(WallpaperManager.FLAG_LOCK)?.primaryColor?.toArgb() ?: -1
-        else -1
+        // Lock wallpaper
+        val currLock = wm.getWallpaperColors(WallpaperManager.FLAG_LOCK)
+            ?.primaryColor
+            ?.toArgb() ?: -1
         val savedLock = prefs.getInt(KEY_LAST_BACKUP_COLOR_LOCK, -1)
 
-        if (savedHome != currHome || savedLock != currLock) {
-            showBackupHomePrompt.value = savedHome != currHome
-            showBackupLockPrompt.value = savedLock != currLock
+        // Sólo mostrar “restore HOME” si Home cambió
+        val homeChanged = currHome != savedHome
+
+        // Sólo mostrar “restore LOCK” si Lock cambió y NO estamos en modo bloqueo
+        val lockChanged = (currLock != savedLock) && !blockingState.value
+
+        if (homeChanged || lockChanged) {
+            showBackupHomePrompt.value = homeChanged
+            showBackupLockPrompt.value = lockChanged
+
             prefs.edit()
                 .putBoolean("backup_home_prompt", showBackupHomePrompt.value)
                 .putBoolean("backup_lock_prompt", showBackupLockPrompt.value)
@@ -239,6 +249,7 @@ class MainActivity : ComponentActivity() {
         prefs = PreferenceManager.getDefaultSharedPreferences(this)
         showBackupHomePrompt = mutableStateOf(prefs.getBoolean("backup_home_prompt", false))
         showBackupLockPrompt = mutableStateOf(prefs.getBoolean("backup_lock_prompt", false))
+        blockingState = mutableStateOf(prefs.getBoolean("blocking_enabled", false))
 
         // Overlay permission
         if (!Settings.canDrawOverlays(this)) {
@@ -303,9 +314,16 @@ class MainActivity : ComponentActivity() {
             val wm = WallpaperManager.getInstance(this)
             wallpaperColorsListener = WallpaperManager.OnColorsChangedListener { colors, which ->
                 if (!isInternalWallpaperChange && System.currentTimeMillis() - lastInternalWallpaperChange >= 2_000L) {
-                    when(which) {
-                        WallpaperManager.FLAG_SYSTEM -> showBackupHomePrompt.value = true
-                        WallpaperManager.FLAG_LOCK -> showBackupLockPrompt.value = true
+                    when (which) {
+                        WallpaperManager.FLAG_SYSTEM -> {
+                            showBackupHomePrompt.value = true
+                        }
+                        WallpaperManager.FLAG_LOCK -> {
+                            // SOLO si el bloqueo NO está activo
+                            if (!blockingState.value) {
+                                showBackupLockPrompt.value = true
+                            }
+                        }
                     }
                     prefs.edit()
                         .putBoolean("backup_home_prompt", showBackupHomePrompt.value)
