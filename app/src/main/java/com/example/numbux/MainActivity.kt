@@ -103,6 +103,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.unit.dp
 import androidx.activity.result.ActivityResultLauncher
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -480,7 +483,6 @@ class MainActivity : ComponentActivity() {
                 NumbuxTheme {
                     Scaffold(
                         topBar = {
-                            // Pass the same drawerState & scope here
                             NumbuXAppBar(
                                 drawerState = drawerState,
                                 scope       = scope,
@@ -488,10 +490,16 @@ class MainActivity : ComponentActivity() {
                             )
                         },
                         bottomBar = {
-                            when (currentPage) {
-                                1 -> BasicCalculator()
-                                2 -> ScientificCalculator()
-                                3 -> DictionaryBottomBar()
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .navigationBarsPadding()  // pushes content above the nav bar
+                            ) {
+                                when (currentPage) {
+                                    1 -> BasicCalculator()
+                                    2 -> ScientificCalculator()
+                                    3 -> DictionaryBottomBar()
+                                }
                             }
                         }
                     ) { innerPadding ->
@@ -503,8 +511,14 @@ class MainActivity : ComponentActivity() {
                             verticalArrangement = Arrangement.spacedBy(20.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            if (showBackupHomePrompt.value) Button({ pickHomeLauncher.launch(arrayOf("image/*")) }) { Text("🖼 Restaurar HOME") }
-                            if (showBackupLockPrompt.value) Button({ pickLockLauncher.launch(arrayOf("image/*")) }) { Text("🔒 Restaurar LOCK") }
+                            if (showBackupHomePrompt.value)
+                                Button({ pickHomeLauncher.launch(arrayOf("image/*")) }) {
+                                    Text("🖼 Restaurar HOME")
+                                }
+                            if (showBackupLockPrompt.value)
+                                Button({ pickLockLauncher.launch(arrayOf("image/*")) }) {
+                                    Text("🔒 Restaurar LOCK")
+                                }
                         }
 
                         if (showBackupDialog) {
