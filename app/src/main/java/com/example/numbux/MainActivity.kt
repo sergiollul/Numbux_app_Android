@@ -344,7 +344,7 @@ class MainActivity : ComponentActivity() {
                 drawerContent = {
                     ModalDrawerSheet(
                         modifier = Modifier
-                            .fillMaxHeight(0.85f)
+                            .fillMaxHeight(0.83f)
                             .border(
                                 width = 2.dp,
                                 color = androidx.compose.ui.graphics.Color(0xCCFF6300),
@@ -353,16 +353,18 @@ class MainActivity : ComponentActivity() {
                             .padding(0.dp),
                         drawerShape = RoundedCornerShape(16.dp),
                         drawerContainerColor = androidx.compose.ui.graphics.Color(0xB3000000),
-                        drawerContentColor = androidx.compose.ui.graphics.Color(0xFFFFFFFF)
+                        drawerContentColor = androidx.compose.ui.graphics.Color(0xFFFFFFFF),
+                        windowInsets = WindowInsets(0, 0, 0, 0),  // desactiva safe-area padding
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
+                            Spacer(modifier = Modifier.height(28.dp))  // crea espacio extra
                             Text(
                                 text = "NumbuX",
                                 color = androidx.compose.ui.graphics.Color(0xFFFF6300),
                                 fontSize = 20.sp,
                                 modifier = Modifier.padding(vertical = 8.dp)
                             )
-                            Spacer(modifier = Modifier.height(24.dp))  // crea espacio extra bajo el texto
+                            Spacer(modifier = Modifier.height(12.dp))  // crea espacio extra
 
                             BlockerToggle(
                                 enabled = blockingState.value,
@@ -485,7 +487,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             ) {
-
                 NumbuxTheme {
                     Scaffold(
                         topBar = {
