@@ -337,13 +337,14 @@ class MainActivity : ComponentActivity() {
                 ActivityResultContracts.OpenDocument()) { uri -> uri?.let { saveBackup(it, "home") }}
             val pickLockLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.OpenDocument()) { uri -> uri?.let { saveBackup(it, "lock") }}
+            val maxPage = 3
 
             ModalNavigationDrawer(
                 drawerState = drawerState,
                 drawerContent = {
                     ModalDrawerSheet(
                         modifier = Modifier
-                            .fillMaxHeight(0.9f)
+                            .fillMaxHeight(0.85f)
                             .border(
                                 width = 2.dp,
                                 color = androidx.compose.ui.graphics.Color(0xCCFF6300),
@@ -383,7 +384,7 @@ class MainActivity : ComponentActivity() {
                             // ── Push everything above up ──────────────────────────────────────
                             Spacer(modifier = Modifier.weight(1f))
 
-                            val maxPage = 3
+
                             Row(
                                 modifier = Modifier
                                     .align(Alignment.CenterHorizontally)
