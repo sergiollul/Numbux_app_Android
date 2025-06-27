@@ -113,7 +113,7 @@ class AppBlockerService : AccessibilityService() {
         val navBarH = if (navBarId > 0) res.getDimensionPixelSize(navBarId) else 0
 
         // 5) Convert 100 dp into pixels for your extra bottom gap
-        val bottomGapDp = 100f
+        val bottomGapDp = 175f
         val displayMetrics = res.displayMetrics
         val bottomGapPx = (bottomGapDp * displayMetrics.density).toInt()
 
