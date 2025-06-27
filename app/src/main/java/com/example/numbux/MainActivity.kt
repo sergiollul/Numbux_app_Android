@@ -616,12 +616,28 @@ class MainActivity : ComponentActivity() {
         if(writeRemote) dbRef.setValue(true)
         blockingState.value=true
     }
-
+    
+    @SuppressLint("NewApi")
     private fun disableBlocking(wm: WallpaperManager, writeRemote: Boolean = true) {
         // Suppress listener and restore both home and lock wallpapers
         doWallpaperSwap {
-            restoreHome(wm)
-            restoreLock(wm)
+            // Lee tu backup HOME (o LOCK, si prefieres) de disco…
+            val file = File(filesDir, "wallpaper_backup_home.png")
+            if (file.exists()) {
+                val bmp = BitmapFactory.decodeFile(file.absolutePath)
+                // Unifica en una sola llamada: aplica bmp a SYSTEM y LOCK a la vez
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    wm.setBitmap(
+                        bmp,
+                        /* visibleCropHint = */ null,
+                        /* allowBackup    = */ true,
+                        /* which          = */ WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK
+                    )
+                } else {
+                    // APIs antiguas no soportan multi‐flag: haz sólo SYSTEM, y acepta el blink en LOCK
+                    wm.setBitmap(bmp)
+                }
+            }
         }
 
         // Re-read and persist the restored colors
