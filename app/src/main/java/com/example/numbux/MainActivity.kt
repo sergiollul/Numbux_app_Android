@@ -95,6 +95,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.runtime.setValue
 import com.example.numbux.ui.DictionaryBottomBar
 import com.example.numbux.ui.ScientificCalculator
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -170,6 +177,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var wallpaperColorsListener: WallpaperManager.OnColorsChangedListener
     private var isInternalWallpaperChange = false
     private var lastInternalWallpaperChange: Long = 0L
+    private var hasShownBackupExplanation = false
+    private var showBackupDialog by mutableStateOf(false)
 
     private var backupHomeUri: Uri?
         get() = prefs.getString("backup_home_uri", null)?.let(Uri::parse)
@@ -485,6 +494,12 @@ class MainActivity : ComponentActivity() {
                             if (showBackupHomePrompt.value) Button({ pickHomeLauncher.launch(arrayOf("image/*")) }) { Text("🖼 Restaurar HOME") }
                             if (showBackupLockPrompt.value) Button({ pickLockLauncher.launch(arrayOf("image/*")) }) { Text("🔒 Restaurar LOCK") }
                         }
+
+                        if (showBackupDialog) {
+                            BackupExplanationDialog {
+                                showBackupDialog = false
+                            }
+                        }
                     }
                 }
             }
@@ -597,7 +612,129 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onResume() {
-        super.onResume(); checkForWallpaperChange(); if(!isAccessibilityServiceEnabled(this) && accessibilityDialog?.isShowing!=true) showEnableAccessibilityDialog() else accessibilityDialog?.dismiss()
+        super.onResume()
+        checkForWallpaperChange()
+
+        if (!isAccessibilityServiceEnabled(this) && accessibilityDialog?.isShowing != true) {
+            showEnableAccessibilityDialog()
+        } else {
+            accessibilityDialog?.dismiss()
+
+            // 2) Right after dismissing, show your explanation exactly once:
+            if (!hasShownBackupExplanation) {
+                showBackupExplanation()
+                hasShownBackupExplanation = true
+            }
+        }
+    }
+
+    private fun showBackupExplanation() {
+        showBackupDialog = true
+    }
+
+    @Composable
+    fun BackupExplanationDialog(onDismiss: () -> Unit) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+
+            // ← only one modifier block, combining width, background & padding
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .border(
+                    width = 2.dp,
+                    color = androidx.compose.ui.graphics.Color(0xFFFF6300),
+                    shape = RoundedCornerShape(16.dp)
+                ),
+            containerColor = androidx.compose.ui.graphics.Color(0xFF000000),
+            tonalElevation = 0.dp,
+            shape = RoundedCornerShape(16.dp),
+
+            // Title if you need it:
+            title = {
+                Text(
+                    text = "Restaurar Fondos",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = androidx.compose.ui.graphics.Color.White
+                )
+            },
+
+            text = {
+                Column {
+                    Text(
+                        text = "¿Qué son estos botones?",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = androidx.compose.ui.graphics.Color.White
+                    )
+                    Spacer(Modifier.height(4.dp))
+
+                    Button(
+                        onClick = { /* no-op */ },
+                        enabled = false,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = androidx.compose.ui.graphics.Color(0xFFFF6300),
+                            disabledContainerColor = androidx.compose.ui.graphics.Color(0xFFFF6300),
+                            contentColor = androidx.compose.ui.graphics.Color.White,
+                            disabledContentColor = androidx.compose.ui.graphics.Color.White
+                        )
+                    ) {
+                        Text(
+                            text = "🖼 Restaurar HOME",
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    Spacer(Modifier.height(4.dp))
+
+                    Button(
+                        onClick = { /* no-op */ },
+                        enabled = false,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = androidx.compose.ui.graphics.Color(0xFFFF6300),
+                            disabledContainerColor = androidx.compose.ui.graphics.Color(0xFFFF6300),
+                            contentColor = androidx.compose.ui.graphics.Color.White,
+                            disabledContentColor = androidx.compose.ui.graphics.Color.White
+                        )
+                    ) {
+                        Text(
+                            text = "🔒 Restaurar LOCK",
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    Spacer(Modifier.height(24.dp))
+
+                    Text(
+                        text = """
+                        Cuando el modo foco esté activado, tu fondo cambiará.
+                        
+                        Estos botones son para que NumbuX restaure tu fondo una vez el modo foco se desactive.
+                        
+                        Por favor, selecciona tus fondos con estos botones.
+                    """.trimIndent(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = androidx.compose.ui.graphics.Color.White
+                    )
+                }
+            },
+
+            confirmButton = {
+                TextButton(onClick = onDismiss) {
+                    Text("OK")
+                }
+            }
+        )
     }
 
     private fun isAccessibilityServiceEnabled(context: Context):Boolean{

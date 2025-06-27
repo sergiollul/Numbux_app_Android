@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:background="@drawable/dialog_background"
+    android:padding="24dp"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <!-- Title -->
+    <TextView
+        android:id="@+id/tvDialogTitle"
+        style="@style/TextAppearance.Material3.HeadlineSmall"
+        android:text="Restaurar Fondos"
+        android:textStyle="bold"
+        android:textColor="@color/white"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+
+    <!-- Buttons Row -->
+    <LinearLayout
+        android:orientation="horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:gravity="center">
+
+        <Button
+            android:id="@+id/btnOption1"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Opción 1"
+            android:enabled="false" />
+
+        <Space
+            android:layout_width="16dp"
+            android:layout_height="wrap_content" />
+
+        <Button
+            android:id="@+id/btnOption2"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="Opción 2"
+            android:enabled="false" />
+
+    </LinearLayout>
+
+    <!-- Explanation Header -->
+    <TextView
+        android:id="@+id/tvExplanationHeader"
+        style="@style/TextAppearance.Material3.TitleMedium"
+        android:text="¿Qué sigue?"
+        android:textColor="@color/white"
+        android:layout_marginTop="24dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+
+    <!-- Message -->
+    <TextView
+        android:id="@+id/tvDialogMessage"
+        style="@style/TextAppearance.Material3.BodyMedium"
+        android:layout_marginTop="16dp"
+        android:text="Para que NumbuX funcione correctamente, ve a:\n\n1. Prueba\n\n2. Prueba\n\n3. Prueba"
+        android:textColor="@color/white"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+
+</LinearLayout>
