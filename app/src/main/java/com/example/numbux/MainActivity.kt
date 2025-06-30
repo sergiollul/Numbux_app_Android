@@ -174,7 +174,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private lateinit var prefs: SharedPreferences
-    private lateinit var blockingState: MutableState<Boolean>
+    private val blockingState = mutableStateOf(false)
     private var accessibilityDialog: AlertDialog? = null
     private lateinit var showBackupHomePrompt: MutableState<Boolean>
     private lateinit var showBackupLockPrompt: MutableState<Boolean>
@@ -239,26 +239,32 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // 1) Accessibility launcher
         accessibilityLauncher = registerForActivityResult(
             ActivityResultContracts.StartActivityForResult()
         ) { _ ->
-            // Called as soon as the user returns from Accessibility Settings
             if (isAccessibilityServiceEnabled(this)) {
                 accessibilityDialog?.dismiss()
                 accessibilityDialog = null
             }
         }
+
+        // 2) Preferences
         prefs = PreferenceManager.getDefaultSharedPreferences(this)
-        showBackupHomePrompt = mutableStateOf(prefs.getBoolean("backup_home_prompt", false))
-        showBackupLockPrompt = mutableStateOf(prefs.getBoolean("backup_lock_prompt", false))
-        blockingState = mutableStateOf(prefs.getBoolean("blocking_enabled", false))
 
+        // 3) Initialize your single blockingState
+        blockingState.value = prefs.getBoolean("blocking_enabled", false)
 
+        // 4) Backup prompts
+        showBackupHomePrompt  = mutableStateOf(prefs.getBoolean("backup_home_prompt", false))
+        showBackupLockPrompt  = mutableStateOf(prefs.getBoolean("backup_lock_prompt", false))
 
-        // Accessibility service
-        if (!isAccessibilityServiceEnabled(this)) showEnableAccessibilityDialog()
+        // 5) Accessibility service check
+        if (!isAccessibilityServiceEnabled(this)) {
+            showEnableAccessibilityDialog()
+        }
 
-        // First-run init
+        // 6) First‐run initialization
         if (!prefs.getBoolean("has_initialized", false)) {
             val wm = WallpaperManager.getInstance(this)
             val homeColor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1)
@@ -267,6 +273,7 @@ class MainActivity : ComponentActivity() {
             val lockColor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1)
                 wm.getWallpaperColors(WallpaperManager.FLAG_LOCK)?.primaryColor?.toArgb() ?: -1
             else -1
+
             prefs.edit()
                 .putBoolean("has_initialized", true)
                 .putBoolean("blocking_enabled", false)
@@ -275,19 +282,19 @@ class MainActivity : ComponentActivity() {
                 .putBoolean("backup_home_prompt", true)
                 .putBoolean("backup_lock_prompt", true)
                 .apply()
+
             showBackupHomePrompt.value = true
             showBackupLockPrompt.value = true
         }
 
-        // Catch-up wallpaper
+        // 7) Catch‐up wallpaper state
         checkForWallpaperChange()
 
-        blockingState = mutableStateOf(prefs.getBoolean("blocking_enabled", false))
-
-        // Firebase listener
+        // 8) Firebase listener
         val firebaseUrl = "https://numbux-790d6-default-rtdb.europe-west1.firebasedatabase.app"
         dbRef = Firebase.database(firebaseUrl)
             .getReference("rooms/testRoom/blocking_enabled")
+
         firebaseListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val remote = snapshot.getValue(Boolean::class.java) ?: false
@@ -296,7 +303,8 @@ class MainActivity : ComponentActivity() {
                     if (blockingState.value != remote) {
                         blockingState.value = remote
                         val wm = WallpaperManager.getInstance(this@MainActivity)
-                        if (remote) enableBlocking(wm, false) else disableBlocking(wm, false)
+                        if (remote) enableBlocking(wm, false)
+                        else        disableBlocking(wm, false)
                     }
                 }
             }
@@ -964,13 +972,24 @@ class MainActivity : ComponentActivity() {
         // Firebase
         dbRef.addValueEventListener(firebaseListener)
 
-        // Wallpaper-colors
+        // Wallpaper‐colors
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             WallpaperManager
                 .getInstance(this)
-                .addOnColorsChangedListener(wallpaperColorsListener, Handler(Looper.getMainLooper()))
+                .addOnColorsChangedListener(
+                    wallpaperColorsListener,
+                    Handler(Looper.getMainLooper())
+                )
         } else {
-            registerReceiver(wallpaperChangedReceiver, IntentFilter(Intent.ACTION_WALLPAPER_CHANGED))
+            wallpaperChangedReceiver = object : BroadcastReceiver() {
+                override fun onReceive(ctx: Context, intent: Intent) {
+                    // …
+                }
+            }
+            registerReceiver(
+                wallpaperChangedReceiver,
+                IntentFilter(Intent.ACTION_WALLPAPER_CHANGED)
+            )
         }
     }
 
@@ -979,19 +998,18 @@ class MainActivity : ComponentActivity() {
         // Firebase
         dbRef.removeEventListener(firebaseListener)
 
-        // Wallpaper-colors
+        // Wallpaper‐colors
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             WallpaperManager
                 .getInstance(this)
                 .removeOnColorsChangedListener(wallpaperColorsListener)
         } else {
-            unregisterReceiver(wallpaperChangedReceiver)
+            wallpaperChangedReceiver?.let { unregisterReceiver(it) }
         }
     }
 
-    override fun onDestroy(){
+    override fun onDestroy() {
         super.onDestroy()
-        if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.O_MR1) WallpaperManager.getInstance(this).removeOnColorsChangedListener(wallpaperColorsListener)
-        else unregisterReceiver(wallpaperChangedReceiver)
     }
+
 }
