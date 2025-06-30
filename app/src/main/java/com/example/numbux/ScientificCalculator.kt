@@ -51,6 +51,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.platform.LocalDensity
+import com.example.numbux.ui.BlinkingCursorField
 
 @Composable
 fun ScientificCalculator() {
@@ -83,31 +84,20 @@ fun ScientificCalculator() {
             .padding(16.dp),
         verticalArrangement = Arrangement.Top
     ) {
-        // ─── BASIC TEXT FIELD ──────────────────────────────────────────────
-        BasicTextField(
-            value             = fieldValue,
-            onValueChange     = { fieldValue = it },
-            readOnly          = true,
-            interactionSource = textFieldInteraction,
-            cursorBrush       = SolidColor(Color(0xFFFF6300)),
-            textStyle = MaterialTheme.typography.headlineMedium.copy(
-                color     = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.End
-            ),
+        // ─── CUSTOM BLINKING CURSOR FIELD ───────────────────────────────
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(IntrinsicSize.Min)
                 .focusable(interactionSource = textFieldInteraction)
-                .focusRequester(focusRequester),
-            decorationBox = { inner ->
-                Box(
-                    modifier         = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.CenterEnd
-                ) {
-                    inner()
-                }
-            }
-        )
+                .focusRequester(focusRequester)
+        ) {
+            BlinkingCursorField(
+                fieldValue    = fieldValue,
+                onValueChange = { fieldValue = it },
+                modifier      = Modifier.fillMaxSize()
+            )
+        }
 
         // ─── BACKSPACE ─────────────────────────────────────────────────────
         Row(
