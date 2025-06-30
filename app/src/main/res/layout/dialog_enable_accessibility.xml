@@ -23,8 +23,7 @@
         android:layout_marginTop="16dp"
         android:text="Para que NumbuX funcione correctamente, ve a: \n
         \n1. Apps Instaladas → NumbuX\n
-        \n2. ON → Permitir\n
-        \n3. Cierra y vuelve a abrir. 🚀"
+        \n2. ON → Permitir"
         android:textColor="@color/white"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>

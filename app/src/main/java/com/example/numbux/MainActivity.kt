@@ -621,22 +621,25 @@ class MainActivity : ComponentActivity() {
     private fun disableBlocking(wm: WallpaperManager, writeRemote: Boolean = true) {
         // Suppress listener and restore both home and lock wallpapers
         doWallpaperSwap {
-            // Lee tu backup HOME (o LOCK, si prefieres) de disco…
-            val file = File(filesDir, "wallpaper_backup_home.png")
-            if (file.exists()) {
-                val bmp = BitmapFactory.decodeFile(file.absolutePath)
-                // Unifica en una sola llamada: aplica bmp a SYSTEM y LOCK a la vez
+            // 1) Restore HOME wallpaper
+            File(filesDir, "wallpaper_backup_home.png").takeIf { it.exists() }?.let { homeFile ->
+                val homeBmp = BitmapFactory.decodeFile(homeFile.absolutePath)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    wm.setBitmap(
-                        bmp,
-                        /* visibleCropHint = */ null,
-                        /* allowBackup    = */ true,
-                        /* which          = */ WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK
-                    )
+                    wm.setBitmap(homeBmp, /* visibleCropHint = */ null, /* allowBackup = */ true,
+                        WallpaperManager.FLAG_SYSTEM)
                 } else {
-                    // APIs antiguas no soportan multi‐flag: haz sólo SYSTEM, y acepta el blink en LOCK
-                    wm.setBitmap(bmp)
+                    wm.setBitmap(homeBmp)
                 }
+            }
+
+            // 2) Restore LOCK wallpaper
+            File(filesDir, "wallpaper_backup_lock.png").takeIf { it.exists() }?.let { lockFile ->
+                val lockBmp = BitmapFactory.decodeFile(lockFile.absolutePath)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    wm.setBitmap(lockBmp, /* visibleCropHint = */ null, /* allowBackup = */ true,
+                        WallpaperManager.FLAG_LOCK)
+                }
+                // on older APIs there’s no explicit FLAG_LOCK, so it’ll blink — that’s inevitable
             }
         }
 
