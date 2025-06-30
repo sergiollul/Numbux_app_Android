@@ -39,6 +39,89 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Backspace
 import kotlinx.coroutines.delay
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.runtime.*
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.*
+import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
+import androidx.compose.foundation.ExperimentalFoundationApi
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun BlinkingCursorField(
+    fieldValue: TextFieldValue,
+    onValueChange: (TextFieldValue) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var textLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    var showCursor by remember { mutableStateOf(true) }
+    val density = LocalDensity.current
+
+    // Parpadeo
+    LaunchedEffect(fieldValue.selection) {
+        while (true) {
+            delay(450)
+            showCursor = !showCursor
+        }
+    }
+
+    BasicTextField(
+        value = fieldValue,
+        onValueChange = onValueChange,
+        readOnly = true,
+        cursorBrush = SolidColor(Color.Transparent),
+        textStyle = MaterialTheme.typography.headlineMedium.copy(
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.End
+        ),
+        interactionSource = remember { MutableInteractionSource() },
+        onTextLayout = { textLayout = it },
+        modifier = modifier
+    ) { inner ->
+        Box(Modifier.fillMaxSize()) {
+            // ⇒ cambiar a TOP_END para multiline
+            Box(Modifier.align(Alignment.TopEnd)) {
+                inner()
+
+                if (showCursor && textLayout != null) {
+                    val layout = textLayout!!
+
+                    // 1) clamp selection to [0..textLen]
+                    val textLen = fieldValue.text.length
+                    val sel = fieldValue.selection.start.coerceIn(0, textLen)
+
+                    // 2) try to get a CursorRect – if that fails, bail out early
+                    val cursorRect = runCatching { layout.getCursorRect(sel) }
+                        .getOrNull()
+                        ?: return@Box  // skip drawing this frame
+
+                    // 3) now draw the caret exactly where getCursorRect told us to
+                    Box(
+                        Modifier
+                            .offset {
+                                IntOffset(
+                                    x = cursorRect.left.roundToInt(),
+                                    y = cursorRect.top.roundToInt()
+                                )
+                            }
+                            .width(2.dp)
+                            .height(with(density) { cursorRect.height.toDp() })
+                            .background(Color(0xFFFF6300))
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun BasicCalculator() {
     var result by remember { mutableStateOf("") }
@@ -64,30 +147,19 @@ fun BasicCalculator() {
         verticalArrangement = Arrangement.Top
     ) {
         // 1) tappable, movable‐cursor display
-        BasicTextField(
-            value = fieldValue,
-            onValueChange = { fieldValue = it },
-            readOnly = true,
-            interactionSource = textFieldInteraction,
-            cursorBrush = SolidColor(Color(0xFFFF6300)),
-            textStyle = MaterialTheme.typography.headlineMedium.copy(
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.End
-            ),
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(IntrinsicSize.Min)
+                .focusRequester(focusRequester)
                 .focusable(interactionSource = textFieldInteraction)
-                .focusRequester(focusRequester),
-            decorationBox = { inner ->
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.CenterEnd
-                ) {
-                    inner()
-                }
-            }
-        )
+        ) {
+            BlinkingCursorField(
+                fieldValue = fieldValue,
+                onValueChange = { fieldValue = it },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
         // ROW SOLO para el botón back, sin padding vertical extra
         Row(
