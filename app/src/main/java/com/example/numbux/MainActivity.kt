@@ -236,6 +236,13 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun updateBlocking(enabled: Boolean, writeRemote: Boolean = true) {
+        val wm = WallpaperManager.getInstance(this)
+        if (enabled) enableBlocking(wm, writeRemote)
+        else        disableBlocking(wm, writeRemote)
+        blockingState.value = enabled
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -290,7 +297,7 @@ class MainActivity : ComponentActivity() {
         // 7) Catch‐up wallpaper state
         checkForWallpaperChange()
 
-        // 8) Firebase listener
+        // 8) Firebase listener setup
         val firebaseUrl = "https://numbux-790d6-default-rtdb.europe-west1.firebasedatabase.app"
         dbRef = Firebase.database(firebaseUrl)
             .getReference("rooms/testRoom/blocking_enabled")
@@ -298,13 +305,10 @@ class MainActivity : ComponentActivity() {
         firebaseListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val remote = snapshot.getValue(Boolean::class.java) ?: false
-                Log.i("MainActivity", "🔌 Firebase onDataChange — remote=$remote, local=${blockingState.value}")
+                Log.i("MainActivity", "Remote toggled → $remote")
                 runOnUiThread {
                     if (blockingState.value != remote) {
-                        blockingState.value = remote
-                        val wm = WallpaperManager.getInstance(this@MainActivity)
-                        if (remote) enableBlocking(wm, false)
-                        else        disableBlocking(wm, false)
+                        updateBlocking(remote, /* writeRemote = */ false)
                     }
                 }
             }
@@ -392,9 +396,14 @@ class MainActivity : ComponentActivity() {
                             FocusModeToggle(
                                 enabled = blockingState.value,
                                 onToggle = { newState ->
-                                    if (newState) enableBlocking(wm)
-                                    else showDisablePinDialog { ok ->
-                                        if (ok) disableBlocking(wm)
+                                    if (newState) {
+                                        // no pin check on enable
+                                        updateBlocking(true)
+                                    } else {
+                                        // show PIN dialog, then…
+                                        showDisablePinDialog { ok ->
+                                            if (ok) updateBlocking(false)
+                                        }
                                     }
                                 }
                             )
