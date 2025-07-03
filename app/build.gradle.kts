@@ -80,4 +80,5 @@ dependencies {
     implementation ("androidx.activity:activity-compose:1.7.2")
     debugImplementation ("androidx.compose.ui:ui-tooling-preview:1.5.0")
     debugImplementation ("androidx.compose.ui:ui-tooling:1.5.0")
+    implementation("com.google.firebase:firebase-messaging-ktx:23.1.0")
 }

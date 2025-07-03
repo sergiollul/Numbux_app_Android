@@ -107,6 +107,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.shape.CircleShape
+import com.google.firebase.messaging.ktx.messaging
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -189,6 +190,7 @@ class MainActivity : ComponentActivity() {
     private var showBackupDialog by mutableStateOf(false)
     private lateinit var accessibilityLauncher: ActivityResultLauncher<Intent>
     private lateinit var firebaseListener: ValueEventListener
+    private lateinit var roomId: String
 
     private var backupHomeUri: Uri?
         get() = prefs.getString("backup_home_uri", null)?.let(Uri::parse)
@@ -587,6 +589,7 @@ class MainActivity : ComponentActivity() {
             )
             return
         }
+        roomId = intent.getStringExtra("ROOM_ID") ?: "testRoom"
     }
 
     /**
@@ -978,6 +981,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        Firebase.messaging
+            .subscribeToTopic("blocking-updates-$roomId")
+            .addOnCompleteListener { task ->
+                if (!task.isSuccessful) {
+                    Log.w("MainActivity", "FCM topic subscribe failed", task.exception)
+                }
+            }
         // Firebase
         dbRef.addValueEventListener(firebaseListener)
 
