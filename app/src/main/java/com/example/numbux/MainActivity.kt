@@ -107,7 +107,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.shape.CircleShape
-import com.google.firebase.messaging.ktx.messaging
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -190,7 +189,7 @@ class MainActivity : ComponentActivity() {
     private var showBackupDialog by mutableStateOf(false)
     private lateinit var accessibilityLauncher: ActivityResultLauncher<Intent>
     private lateinit var firebaseListener: ValueEventListener
-    private lateinit var roomId: String
+    private lateinit var firebaseRef: DatabaseReference
 
     private var backupHomeUri: Uri?
         get() = prefs.getString("backup_home_uri", null)?.let(Uri::parse)
@@ -240,9 +239,17 @@ class MainActivity : ComponentActivity() {
 
     private fun updateBlocking(enabled: Boolean, writeRemote: Boolean = true) {
         val wm = WallpaperManager.getInstance(this)
-        if (enabled) enableBlocking(wm, writeRemote)
-        else        disableBlocking(wm, writeRemote)
+        if (enabled) {
+            WallpaperHelper.enableLockWallpaper(this)
+        } else {
+            WallpaperHelper.restoreOriginalWallpapers(this)
+        }
         blockingState.value = enabled
+
+        // persist locally
+        prefs.edit().putBoolean("blocking_enabled", enabled).apply()
+        // optionally write remotely
+        if (writeRemote) firebaseRef.setValue(enabled)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -589,7 +596,6 @@ class MainActivity : ComponentActivity() {
             )
             return
         }
-        roomId = intent.getStringExtra("ROOM_ID") ?: "testRoom"
     }
 
     /**
@@ -981,13 +987,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        Firebase.messaging
-            .subscribeToTopic("blocking-updates-$roomId")
-            .addOnCompleteListener { task ->
-                if (!task.isSuccessful) {
-                    Log.w("MainActivity", "FCM topic subscribe failed", task.exception)
-                }
-            }
         // Firebase
         dbRef.addValueEventListener(firebaseListener)
 

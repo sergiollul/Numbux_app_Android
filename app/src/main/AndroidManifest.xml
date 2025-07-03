@@ -71,14 +71,6 @@
         </receiver>
 
         <service
-            android:name=".FCMService"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.google.firebase.MESSAGING_EVENT"/>
-            </intent-filter>
-        </service>
-
-        <service
             android:name=".accessibility.AppBlockerService"
             android:exported="false"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"

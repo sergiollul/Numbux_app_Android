@@ -18,6 +18,7 @@ import androidx.preference.PreferenceManager
 import com.example.numbux.control.BlockManager
 import com.example.numbux.ui.PinActivity
 import com.example.numbux.utils.getDefaultLauncherPackage
+import com.example.numbux.WallpaperHelper
 
 import android.provider.Settings
 
@@ -56,7 +57,7 @@ class AppBlockerService : AccessibilityService() {
                 BlockManager.clearAllDismissed()
                 initializeBlockList()
 
-                // 2) If there’s a real 3rd-party app in front, PIN-lock it immediately
+                // 2) PIN-lock any 3rd-party app in front
                 val current = rootInActiveWindow?.packageName?.toString()
                 val homePkg = getDefaultLauncherPackage(this)
                 if (current != null
@@ -75,8 +76,12 @@ class AppBlockerService : AccessibilityService() {
                         )
                     }
                 }
+
+                // 3) Swap in your “locked” wallpaper
+                WallpaperHelper.enableLockWallpaper(this)
+
             } else {
-                // 3) Tearing off: remove any Recents overlay or touch‐blocker you showed
+                // 4) Tear down overlays
                 recentsOverlay?.let {
                     (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it)
                     recentsOverlay = null
@@ -85,8 +90,10 @@ class AppBlockerService : AccessibilityService() {
                     (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it)
                     touchBlocker = null
                 }
-                // 4) And clear any inRecents flag so overlay logic won’t fire until real recents
                 inRecents = false
+
+                // 5) Restore the original wallpapers
+                WallpaperHelper.restoreOriginalWallpapers(this)
             }
         }
 
