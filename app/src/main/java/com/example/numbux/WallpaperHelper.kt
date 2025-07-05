@@ -1,33 +1,26 @@
-// src/main/java/com/example/numbux/WallpaperHelper.kt
 package com.example.numbux
 
-import android.app.Activity
 import android.app.WallpaperManager
 import android.content.Context
 import android.graphics.BitmapFactory
-import android.os.Build
-import android.os.IBinder
-import android.annotation.SuppressLint
-import android.view.View
-import java.io.File
-import android.view.WindowManager
-import android.view.WindowManager.LayoutParams
-import android.view.Gravity
 import android.graphics.PixelFormat
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.annotation.SuppressLint
+import android.view.Gravity
+import android.view.View
+import android.view.WindowManager
+import android.view.WindowManager.LayoutParams
+import java.io.File
 
 object WallpaperHelper {
 
     /**
-     * Sets both the home (SYSTEM) and lock wallpapers to
-     * R.drawable.numbux_wallpaper_homelock, then recenters the
-     * SYSTEM wallpaper so you never see it shifted to the right.
-     *
-     * This works from an Activity or from a Service (e.g. your
-     * AccessibilityService) by temporarily adding an invisible
-     * overlay to get a valid windowToken for recentering.
+     * Applies both SYSTEM and LOCK wallpapers and recenters SYSTEM
+     * by using a temporary overlay and setWallpaperOffsets.
      */
+    @SuppressLint("NewApi")
     fun enableLockWallpaper(ctx: Context) {
         val bmp = BitmapFactory.decodeResource(
             ctx.resources,
@@ -36,7 +29,7 @@ object WallpaperHelper {
         val wm = WallpaperManager.getInstance(ctx)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            // 1) Apply both SYSTEM and LOCK wallpapers
+            // Apply both SYSTEM & LOCK
             wm.setBitmap(
                 bmp,
                 /* visibleCropHint= */ null,
@@ -44,91 +37,96 @@ object WallpaperHelper {
                 /* which= */ WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK
             )
 
-            // 2) Spin up an invisible 1×1 overlay just long enough to grab its token
-            val overlay = View(ctx)
+            // Temporary overlay to recenter
+            val overlay = View(ctx.applicationContext)
+            val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                LayoutParams.TYPE_APPLICATION_OVERLAY
+            } else {
+                @Suppress("DEPRECATION")
+                LayoutParams.TYPE_PHONE
+            }
             val lp = LayoutParams(
                 1, 1,
-                // requires SYSTEM_ALERT_WINDOW permission (you already check canDrawOverlays)
-                LayoutParams.TYPE_APPLICATION_OVERLAY,
+                type,
                 LayoutParams.FLAG_NOT_FOCUSABLE
                         or LayoutParams.FLAG_NOT_TOUCHABLE
                         or LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT
-            ).apply {
-                gravity = Gravity.TOP or Gravity.START
-            }
-            val windowManager = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-            windowManager.addView(overlay, lp)
+            ).apply { gravity = Gravity.TOP or Gravity.START }
 
-            // 3) Recenter the wallpaper using the overlay's token
-            val token: IBinder = overlay.windowToken
+            val wmngr = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            wmngr.addView(overlay, lp)
+
+            // Recenter wallpaper offsets
+            val token = overlay.windowToken
             wm.setWallpaperOffsets(token, 0.5f, 0.5f)
             wm.setWallpaperOffsetSteps(1f, 1f)
 
-            // 4) Tear down the overlay immediately
-            windowManager.removeView(overlay)
-
+            wmngr.removeView(overlay)
         } else {
-            // Pre-Nougat: single-wallpaper API
+            // Pre-N: simple centered set
             wm.setBitmap(bmp)
         }
     }
 
+    /**
+     * Restores HOME and LOCK wallpapers from backups,
+     * centering HOME via one-arg setBitmap + overlay recenter.
+     */
     @SuppressLint("NewApi")
     fun restoreOriginalWallpapers(ctx: Context) {
         val wm = WallpaperManager.getInstance(ctx)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            // ─── 1) Restore HOME wallpaper ───────────────────────────────
+            // Restore HOME (centers automatically)
             File(ctx.filesDir, "wallpaper_backup_home.png")
                 .takeIf { it.exists() }
-                ?.also { f ->
-                    val homeBmp = BitmapFactory.decodeFile(f.absolutePath)
-                    // ← this one-argument call recenters for you
-                    wm.setBitmap(homeBmp)
+                ?.let { f ->
+                    val bmp = BitmapFactory.decodeFile(f.absolutePath)
+                    wm.setBitmap(bmp)
+
+                    // Overlay recenter to clear any parallax
+                    val overlay = View(ctx.applicationContext)
+                    val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        LayoutParams.TYPE_APPLICATION_OVERLAY
+                    } else {
+                        @Suppress("DEPRECATION")
+                        LayoutParams.TYPE_PHONE
+                    }
+                    val lp = LayoutParams(
+                        1, 1,
+                        type,
+                        LayoutParams.FLAG_NOT_FOCUSABLE
+                                or LayoutParams.FLAG_NOT_TOUCHABLE
+                                or LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                        PixelFormat.TRANSLUCENT
+                    ).apply { gravity = Gravity.TOP or Gravity.START }
+
+                    val wmngr2 = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+                    wmngr2.addView(overlay, lp)
+                    val token = overlay.windowToken
+                    wm.setWallpaperOffsets(token, 0.5f, 0.5f)
+                    wm.setWallpaperOffsetSteps(1f, 1f)
+                    wmngr2.removeView(overlay)
                 }
 
-            // ─── 2) (Optional) tiny overlay + recenter to reset parallax ──
-            Handler(Looper.getMainLooper()).postDelayed({
-                val overlay = View(ctx)
-                val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                    WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
-                else
-                    WindowManager.LayoutParams.TYPE_PHONE
-
-                val lp = WindowManager.LayoutParams(
-                    1, 1, type,
-                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                            or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                            or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-                    PixelFormat.TRANSLUCENT
-                ).apply { gravity = Gravity.TOP or Gravity.START }
-
-                val windowManager = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-                windowManager.addView(overlay, lp)
-                wm.setWallpaperOffsets(overlay.windowToken, 0.5f, 0.5f)
-                wm.setWallpaperOffsetSteps(1f, 1f)
-                windowManager.removeView(overlay)
-            }, 100L)
-
-            // ─── 3) Restore LOCK wallpaper (no crop needed) ──────────────
+            // Restore LOCK (no recenter needed)
             File(ctx.filesDir, "wallpaper_backup_lock.png")
                 .takeIf { it.exists() }
-                ?.also { f ->
-                    val lockBmp = BitmapFactory.decodeFile(f.absolutePath)
+                ?.let { f ->
+                    val bmp = BitmapFactory.decodeFile(f.absolutePath)
                     wm.setBitmap(
-                        lockBmp,
+                        bmp,
                         /* visibleCropHint= */ null,
                         /* allowBackup= */ true,
                         /* which= */ WallpaperManager.FLAG_LOCK
                     )
                 }
-
         } else {
-            // Pre-Nougat: single-wallpaper API
+            // Pre-N: simple restore
             File(ctx.filesDir, "wallpaper_backup_home.png")
                 .takeIf { it.exists() }
-                ?.also { f ->
+                ?.let { f ->
                     val bmp = BitmapFactory.decodeFile(f.absolutePath)
                     wm.setBitmap(bmp)
                 }
