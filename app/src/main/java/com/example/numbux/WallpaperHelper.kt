@@ -77,52 +77,41 @@ object WallpaperHelper {
     @SuppressLint("NewApi")
     fun restoreOriginalWallpapers(ctx: Context) {
         val wm = WallpaperManager.getInstance(ctx)
-        val windowManager = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            // 1) Restore HOME wallpaper with an explicit full‐bitmap crop
+            // ─── 1) Restore HOME wallpaper ───────────────────────────────
             File(ctx.filesDir, "wallpaper_backup_home.png")
                 .takeIf { it.exists() }
                 ?.also { f ->
                     val homeBmp = BitmapFactory.decodeFile(f.absolutePath)
-
-                    // new: reset any parallax by cropping to the full image
-                    val fullCrop = android.graphics.Rect(
-                        0, 0,
-                        homeBmp.width, homeBmp.height
-                    )
-
-                    wm.setBitmap(
-                        homeBmp,
-                        /* visibleCropHint= */ fullCrop,
-                        /* allowBackup= */ true,
-                        /* which= */ WallpaperManager.FLAG_SYSTEM
-                    )
+                    // ← this one-argument call recenters for you
+                    wm.setBitmap(homeBmp)
                 }
 
-            // 2) (Optional) tiny overlay + recenter to be extra‐sure
+            // ─── 2) (Optional) tiny overlay + recenter to reset parallax ──
             Handler(Looper.getMainLooper()).postDelayed({
                 val overlay = View(ctx)
                 val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                    LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+                    WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
                 else
-                    LayoutParams.TYPE_PHONE
+                    WindowManager.LayoutParams.TYPE_PHONE
 
-                val lp = LayoutParams(
+                val lp = WindowManager.LayoutParams(
                     1, 1, type,
-                    LayoutParams.FLAG_NOT_FOCUSABLE
-                            or LayoutParams.FLAG_NOT_TOUCHABLE
-                            or LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                            or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                            or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                     PixelFormat.TRANSLUCENT
                 ).apply { gravity = Gravity.TOP or Gravity.START }
 
+                val windowManager = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
                 windowManager.addView(overlay, lp)
                 wm.setWallpaperOffsets(overlay.windowToken, 0.5f, 0.5f)
                 wm.setWallpaperOffsetSteps(1f, 1f)
                 windowManager.removeView(overlay)
             }, 100L)
 
-            // 3) Restore LOCK wallpaper (no crop needed)
+            // ─── 3) Restore LOCK wallpaper (no crop needed) ──────────────
             File(ctx.filesDir, "wallpaper_backup_lock.png")
                 .takeIf { it.exists() }
                 ?.also { f ->
@@ -136,7 +125,7 @@ object WallpaperHelper {
                 }
 
         } else {
-            // Pre‐Nougat: single wallpaper API
+            // Pre-Nougat: single-wallpaper API
             File(ctx.filesDir, "wallpaper_backup_home.png")
                 .takeIf { it.exists() }
                 ?.also { f ->
