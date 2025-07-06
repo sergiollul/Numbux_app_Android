@@ -23,4 +23,3 @@ class WallpaperChangeReceiver : BroadcastReceiver() {
             .apply()
     }
 }
-

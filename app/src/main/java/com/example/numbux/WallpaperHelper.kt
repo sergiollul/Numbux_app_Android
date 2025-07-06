@@ -16,6 +16,7 @@ import android.view.Gravity
 import android.graphics.PixelFormat
 import android.os.Handler
 import android.os.Looper
+import androidx.preference.PreferenceManager
 
 object WallpaperHelper {
 
@@ -58,16 +59,22 @@ object WallpaperHelper {
                 gravity = Gravity.TOP or Gravity.START
             }
             val windowManager = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+
             windowManager.addView(overlay, lp)
 
-            // 3) Recenter the wallpaper using the overlay's token
-            val token: IBinder = overlay.windowToken
-            wm.setWallpaperOffsets(token, 0.5f, 0.5f)
-            wm.setWallpaperOffsetSteps(1f, 1f)
-
-            // 4) Tear down the overlay immediately
-            windowManager.removeView(overlay)
-
+            // 3) Esperar a que el overlay reciba su windowToken, y solo entonces
+            overlay.post {
+                overlay.windowToken?.let { token ->
+                    wm.setWallpaperOffsets(token, 0.5f, 0.5f)
+                    wm.setWallpaperOffsetSteps(1f, 1f)
+                }
+                // 4) Desmontar el overlay
+                try {
+                    windowManager.removeView(overlay)
+                } catch (e: Exception) {
+                    // por si ya fue removido o no está agregado
+                }
+            }
         } else {
             // Pre-Nougat: single-wallpaper API
             wm.setBitmap(bmp)
@@ -76,6 +83,14 @@ object WallpaperHelper {
 
     @SuppressLint("NewApi")
     fun restoreOriginalWallpapers(ctx: Context) {
+
+        // --- MARCO ESTE RESTORE COMO INTERNO (para que el BroadcastReceiver lo ignore)
+            val prefs = PreferenceManager.getDefaultSharedPreferences(ctx)
+            prefs.edit()
+                .putLong("last_internal_wallpaper_change", System.currentTimeMillis())
+                .apply()
+            // ---------------------------------------------------------------
+
         val wm = WallpaperManager.getInstance(ctx)
         val wmngr = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
@@ -106,13 +121,19 @@ object WallpaperHelper {
             File(ctx.filesDir, "wallpaper_backup_lock.png")
                 .takeIf { it.exists() }
                 ?.let { f ->
-                    val lockBmp = BitmapFactory.decodeFile(f.absolutePath)
-                    wm.setBitmap(
-                        lockBmp,
-                        /* visibleCropHint= */ null,
-                        /* allowBackup= */ true,
-                        /* which= */ WallpaperManager.FLAG_LOCK
-                    )
+
+            // marco también justo antes de aplicar el lock
+            prefs.edit()
+                .putLong("last_internal_wallpaper_change", System.currentTimeMillis())
+                .apply()
+            val lockBmp = BitmapFactory.decodeFile(f.absolutePath)
+            wm.setBitmap(
+                    lockBmp,
+                    /* visibleCropHint= */ null,
+                    /* allowBackup= */ true,
+                    /* which= */ WallpaperManager.FLAG_LOCK
+                        )
+
                 }
         } else {
             // Pre-Nougat single‐wallpaper API
