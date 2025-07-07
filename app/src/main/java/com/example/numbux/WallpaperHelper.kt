@@ -85,11 +85,11 @@ object WallpaperHelper {
     fun restoreOriginalWallpapers(ctx: Context) {
 
         // --- MARCO ESTE RESTORE COMO INTERNO (para que el BroadcastReceiver lo ignore)
-            val prefs = PreferenceManager.getDefaultSharedPreferences(ctx)
-            prefs.edit()
-                .putLong("last_internal_wallpaper_change", System.currentTimeMillis())
-                .apply()
-            // ---------------------------------------------------------------
+        val prefs = PreferenceManager.getDefaultSharedPreferences(ctx)
+        prefs.edit()
+            .putLong("last_internal_wallpaper_change", System.currentTimeMillis())
+            .apply()
+        // ---------------------------------------------------------------
 
         val wm = WallpaperManager.getInstance(ctx)
         val wmngr = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -122,17 +122,17 @@ object WallpaperHelper {
                 .takeIf { it.exists() }
                 ?.let { f ->
 
-            // marco también justo antes de aplicar el lock
-            prefs.edit()
-                .putLong("last_internal_wallpaper_change", System.currentTimeMillis())
-                .apply()
-            val lockBmp = BitmapFactory.decodeFile(f.absolutePath)
-            wm.setBitmap(
-                    lockBmp,
-                    /* visibleCropHint= */ null,
-                    /* allowBackup= */ true,
-                    /* which= */ WallpaperManager.FLAG_LOCK
-                        )
+                    // marco también justo antes de aplicar el lock
+                    prefs.edit()
+                        .putLong("last_internal_wallpaper_change", System.currentTimeMillis())
+                        .apply()
+                    val lockBmp = BitmapFactory.decodeFile(f.absolutePath)
+                    wm.setBitmap(
+                        lockBmp,
+                        /* visibleCropHint= */ null,
+                        /* allowBackup= */ true,
+                        /* which= */ WallpaperManager.FLAG_LOCK
+                    )
 
                 }
         } else {

@@ -559,16 +559,18 @@ class MainActivity : ComponentActivity() {
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             // Your “Restaurar” buttons
-                            if (showBackupHomePrompt.value) {
-                                Button({ pickHomeLauncher.launch(arrayOf("image/*")) }) {
-                                    Text("🖼 Restaurar HOME")
-                                }
-                            }
-                            if (showBackupLockPrompt.value) {
-                                Button({ pickLockLauncher.launch(arrayOf("image/*")) }) {
-                                    Text("🔒 Restaurar LOCK")
-                                }
-                            }
+                            if (!blockingState.value) {
+                                     if (showBackupHomePrompt.value) {
+                                             Button({ pickHomeLauncher.launch(arrayOf("image/*")) }) {
+                                                     Text("🖼 Restaurar HOME")
+                                                 }
+                                         }
+                                     if (showBackupLockPrompt.value) {
+                                             Button({ pickLockLauncher.launch(arrayOf("image/*")) }) {
+                                                     Text("🔒 Restaurar LOCK")
+                                                 }
+                                         }
+                                 }
 
                             // Now render page 3’s dictionary in the content,
                             // with its spacer to push it away from the topBar
@@ -614,135 +616,6 @@ class MainActivity : ComponentActivity() {
             ?.primaryColor?.toArgb() ?: -1 else -1
         prefs.edit().putBoolean(keyPrompt,false).putInt(keyColor,color).apply()
         Toast.makeText(this,"Fondo Guardado",Toast.LENGTH_SHORT).show()
-    }
-
-    private fun doWallpaperSwap(action: ()->Unit) {
-        isInternalWallpaperChange=true
-        lastInternalWallpaperChange=System.currentTimeMillis()
-        action()
-        Handler(Looper.getMainLooper()).postDelayed({isInternalWallpaperChange=false},300)
-    }
-
-    private fun enableBlocking(wm: WallpaperManager, writeRemote: Boolean = true) {
-        Log.i("MainActivity", "🔥 enableBlocking() llamada, blockingState=${blockingState.value}")
-        val bmp = BitmapFactory.decodeResource(resources, R.drawable.numbux_wallpaper_homelock)
-        if (bmp == null) {
-            Log.e("MainActivity", "No pude decodificar el drawable")
-            return
-        }
-        doWallpaperSwap {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                try {
-                    Log.d("MainActivity", "→ setBitmap START (SYSTEM|LOCK)")
-                    wm.setBitmap(
-                        bmp,
-                        /* visibleCropHint = */ null,
-                        /* allowBackup = */ true,
-                        WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK
-                    )
-                    Log.d("MainActivity", "← setBitmap OK")
-                } catch (e: Exception) {
-                    Log.e("MainActivity", "Error al cambiar wallpaper", e)
-                }
-            } else {
-                try {
-                    Log.d("MainActivity", "→ setBitmap START (legacy)")
-                    wm.setBitmap(bmp)
-                    Log.d("MainActivity", "← setBitmap OK")
-                } catch (e: Exception) {
-                    Log.e("MainActivity", "Error al cambiar wallpaper (legacy)", e)
-                }
-            }
-        }
-
-        val primary= if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.O_MR1) wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)?.primaryColor?.toArgb()?:Color.BLACK else Color.BLACK
-        prefs.edit()
-            .putInt(KEY_LAST_BACKUP_COLOR_HOME,primary)
-            .putInt(KEY_LAST_BACKUP_COLOR_LOCK,primary)
-            .putBoolean("backup_home_prompt",false)
-            .putBoolean("backup_lock_prompt",false)
-            .putBoolean("blocking_enabled",true)
-            .apply()
-        showBackupHomePrompt.value=false; showBackupLockPrompt.value=false
-        if(writeRemote) dbRef.setValue(true)
-        blockingState.value=true
-    }
-
-    @SuppressLint("NewApi")
-    private fun disableBlocking(wm: WallpaperManager, writeRemote: Boolean = true) {
-        // Suppress listener and restore both home and lock wallpapers
-        doWallpaperSwap {
-            try {
-                Log.d("MainActivity", "→ Restaurando HOME")
-                restoreHome(wm)
-                Log.d("MainActivity", "← HOME restaurado")
-            } catch (e: Exception) {
-                Log.e("MainActivity", "Error restaurando HOME", e)
-            }
-            try {
-                Log.d("MainActivity", "→ Restaurando LOCK")
-                restoreLock(wm)
-                Log.d("MainActivity", "← LOCK restaurado")
-            } catch (e: Exception) {
-                Log.e("MainActivity", "Error restaurando LOCK", e)
-            }
-        }
-
-        // Re-read and persist the restored colors
-        val newHome = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
-                ?.primaryColor
-                ?.toArgb() ?: -1
-        } else -1
-
-        val newLock = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            wm.getWallpaperColors(WallpaperManager.FLAG_LOCK)
-                ?.primaryColor
-                ?.toArgb() ?: -1
-        } else -1
-
-        prefs.edit()
-            .putInt(KEY_LAST_BACKUP_COLOR_HOME, newHome)
-            .putInt(KEY_LAST_BACKUP_COLOR_LOCK, newLock)
-            .putBoolean("backup_home_prompt", false)
-            .putBoolean("backup_lock_prompt", false)
-            .putBoolean("blocking_enabled", false)
-            .apply()
-
-        showBackupHomePrompt.value = false
-        showBackupLockPrompt.value = false
-
-        // Write remote flag if needed
-        if (writeRemote) dbRef.setValue(false)
-        blockingState.value = false
-    }
-
-    @SuppressLint("NewApi")
-    private fun restoreWallpaper(wm: WallpaperManager) {
-        val f=File(filesDir,"wallpaper_backup.png")
-        if(f.exists()){ val bmp=BitmapFactory.decodeFile(f.absolutePath)
-            if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.N) wm.setBitmap(bmp,null,true,WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK) else wm.setBitmap(bmp)
-        } else Toast.makeText(this,"No hay backup de fondo",Toast.LENGTH_SHORT).show()
-    }
-
-    @SuppressLint("NewApi")
-    private fun restoreHome(wm: WallpaperManager) {
-        val f=File(filesDir,"wallpaper_backup_home.png")
-        when {
-            f.exists()->{ val bmp=BitmapFactory.decodeFile(f.absolutePath); wm.setBitmap(bmp,null,true,WallpaperManager.FLAG_SYSTEM) }
-            backupHomeUri!=null-> contentResolver.openInputStream(backupHomeUri!!)?.use{val bmp=BitmapFactory.decodeStream(it); wm.setBitmap(bmp,null,true,WallpaperManager.FLAG_SYSTEM)}
-            else->Toast.makeText(this,"No hay backup HOME",Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    @SuppressLint("NewApi")
-    private fun restoreLock(wm: WallpaperManager) {
-        val f=File(filesDir,"wallpaper_backup_lock.png")
-        when {
-            f.exists()->{val bmp=BitmapFactory.decodeFile(f.absolutePath);wm.setBitmap(bmp,null,true,WallpaperManager.FLAG_LOCK)}
-            backupLockUri!=null-> contentResolver.openInputStream(backupLockUri!!)?.use{val bmp=BitmapFactory.decodeStream(it); wm.setBitmap(bmp,null,true,WallpaperManager.FLAG_LOCK)}
-            else->Toast.makeText(this,"No hay backup LOCK",Toast.LENGTH_SHORT).show()
-        }
     }
 
     override fun onResume() {
