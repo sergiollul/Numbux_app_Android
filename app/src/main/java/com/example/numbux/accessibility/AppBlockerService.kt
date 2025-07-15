@@ -18,7 +18,6 @@ import androidx.preference.PreferenceManager
 import com.example.numbux.control.BlockManager
 import com.example.numbux.ui.PinActivity
 import com.example.numbux.utils.getDefaultLauncherPackage
-import com.example.numbux.WallpaperHelper
 
 import android.provider.Settings
 
@@ -77,8 +76,7 @@ class AppBlockerService : AccessibilityService() {
                     }
                 }
 
-                // 3) Swap in your “locked” wallpaper
-                WallpaperHelper.enableLockWallpaper(this)
+
 
             } else {
                 // 4) Tear down overlays
@@ -91,12 +89,8 @@ class AppBlockerService : AccessibilityService() {
                     touchBlocker = null
                 }
                 inRecents = false
-
-                // 5) Restore the original wallpapers
-                WallpaperHelper.restoreOriginalWallpapers(this)
             }
         }
-
 
     private val handler = Handler(Looper.getMainLooper())
     private var removeRunnable: Runnable? = null

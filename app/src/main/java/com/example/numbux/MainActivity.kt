@@ -174,7 +174,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private lateinit var prefs: SharedPreferences
-    private val blockingState = mutableStateOf(false)
+    private lateinit var blockingState: MutableState<Boolean>
     private var accessibilityDialog: AlertDialog? = null
     private lateinit var showBackupHomePrompt: MutableState<Boolean>
     private lateinit var showBackupLockPrompt: MutableState<Boolean>
@@ -189,7 +189,6 @@ class MainActivity : ComponentActivity() {
     private var showBackupDialog by mutableStateOf(false)
     private lateinit var accessibilityLauncher: ActivityResultLauncher<Intent>
     private lateinit var firebaseListener: ValueEventListener
-    private lateinit var firebaseRef: DatabaseReference
 
     private var backupHomeUri: Uri?
         get() = prefs.getString("backup_home_uri", null)?.let(Uri::parse)
@@ -237,50 +236,29 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun updateBlocking(enabled: Boolean, writeRemote: Boolean = true) {
-        val wm = WallpaperManager.getInstance(this)
-        if (enabled) {
-            WallpaperHelper.enableLockWallpaper(this)
-        } else {
-            WallpaperHelper.restoreOriginalWallpapers(this)
-        }
-        blockingState.value = enabled
-
-        // persist locally
-        prefs.edit().putBoolean("blocking_enabled", enabled).apply()
-        // optionally write remotely
-        if (writeRemote) firebaseRef.setValue(enabled)
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 1) Accessibility launcher
         accessibilityLauncher = registerForActivityResult(
             ActivityResultContracts.StartActivityForResult()
         ) { _ ->
+            // Called as soon as the user returns from Accessibility Settings
             if (isAccessibilityServiceEnabled(this)) {
                 accessibilityDialog?.dismiss()
                 accessibilityDialog = null
             }
         }
-
-        // 2) Preferences
         prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        showBackupHomePrompt = mutableStateOf(prefs.getBoolean("backup_home_prompt", false))
+        showBackupLockPrompt = mutableStateOf(prefs.getBoolean("backup_lock_prompt", false))
+        blockingState = mutableStateOf(prefs.getBoolean("blocking_enabled", false))
 
-        // 3) Initialize your single blockingState
-        blockingState.value = prefs.getBoolean("blocking_enabled", false)
 
-        // 4) Backup prompts
-        showBackupHomePrompt  = mutableStateOf(prefs.getBoolean("backup_home_prompt", false))
-        showBackupLockPrompt  = mutableStateOf(prefs.getBoolean("backup_lock_prompt", false))
 
-        // 5) Accessibility service check
-        if (!isAccessibilityServiceEnabled(this)) {
-            showEnableAccessibilityDialog()
-        }
+        // Accessibility service
+        if (!isAccessibilityServiceEnabled(this)) showEnableAccessibilityDialog()
 
-        // 6) First‐run initialization
+        // First-run init
         if (!prefs.getBoolean("has_initialized", false)) {
             val wm = WallpaperManager.getInstance(this)
             val homeColor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1)
@@ -289,7 +267,6 @@ class MainActivity : ComponentActivity() {
             val lockColor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1)
                 wm.getWallpaperColors(WallpaperManager.FLAG_LOCK)?.primaryColor?.toArgb() ?: -1
             else -1
-
             prefs.edit()
                 .putBoolean("has_initialized", true)
                 .putBoolean("blocking_enabled", false)
@@ -298,26 +275,28 @@ class MainActivity : ComponentActivity() {
                 .putBoolean("backup_home_prompt", true)
                 .putBoolean("backup_lock_prompt", true)
                 .apply()
-
             showBackupHomePrompt.value = true
             showBackupLockPrompt.value = true
         }
 
-        // 7) Catch‐up wallpaper state
+        // Catch-up wallpaper
         checkForWallpaperChange()
 
-        // 8) Firebase listener setup
+        blockingState = mutableStateOf(prefs.getBoolean("blocking_enabled", false))
+
+        // Firebase listener
         val firebaseUrl = "https://numbux-790d6-default-rtdb.europe-west1.firebasedatabase.app"
         dbRef = Firebase.database(firebaseUrl)
             .getReference("rooms/testRoom/blocking_enabled")
-
         firebaseListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val remote = snapshot.getValue(Boolean::class.java) ?: false
-                Log.i("MainActivity", "Remote toggled → $remote")
+                Log.i("MainActivity", "🔌 Firebase onDataChange — remote=$remote, local=${blockingState.value}")
                 runOnUiThread {
                     if (blockingState.value != remote) {
-                        updateBlocking(remote, /* writeRemote = */ false)
+                        blockingState.value = remote
+                        val wm = WallpaperManager.getInstance(this@MainActivity)
+                        if (remote) enableBlocking(wm, false) else disableBlocking(wm, false)
                     }
                 }
             }
@@ -405,14 +384,9 @@ class MainActivity : ComponentActivity() {
                             FocusModeToggle(
                                 enabled = blockingState.value,
                                 onToggle = { newState ->
-                                    if (newState) {
-                                        // no pin check on enable
-                                        updateBlocking(true)
-                                    } else {
-                                        // show PIN dialog, then…
-                                        showDisablePinDialog { ok ->
-                                            if (ok) updateBlocking(false)
-                                        }
+                                    if (newState) enableBlocking(wm)
+                                    else showDisablePinDialog { ok ->
+                                        if (ok) disableBlocking(wm)
                                     }
                                 }
                             )
@@ -559,18 +533,16 @@ class MainActivity : ComponentActivity() {
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             // Your “Restaurar” buttons
-                            if (!blockingState.value) {
-                                     if (showBackupHomePrompt.value) {
-                                             Button({ pickHomeLauncher.launch(arrayOf("image/*")) }) {
-                                                     Text("🖼 Restaurar HOME")
-                                                 }
-                                         }
-                                     if (showBackupLockPrompt.value) {
-                                             Button({ pickLockLauncher.launch(arrayOf("image/*")) }) {
-                                                     Text("🔒 Restaurar LOCK")
-                                                 }
-                                         }
-                                 }
+                            if (showBackupHomePrompt.value) {
+                                Button({ pickHomeLauncher.launch(arrayOf("image/*")) }) {
+                                    Text("🖼 Restaurar HOME")
+                                }
+                            }
+                            if (showBackupLockPrompt.value) {
+                                Button({ pickLockLauncher.launch(arrayOf("image/*")) }) {
+                                    Text("🔒 Restaurar LOCK")
+                                }
+                            }
 
                             // Now render page 3’s dictionary in the content,
                             // with its spacer to push it away from the topBar
@@ -616,6 +588,135 @@ class MainActivity : ComponentActivity() {
             ?.primaryColor?.toArgb() ?: -1 else -1
         prefs.edit().putBoolean(keyPrompt,false).putInt(keyColor,color).apply()
         Toast.makeText(this,"Fondo Guardado",Toast.LENGTH_SHORT).show()
+    }
+
+    private fun doWallpaperSwap(action: ()->Unit) {
+        isInternalWallpaperChange=true
+        lastInternalWallpaperChange=System.currentTimeMillis()
+        action()
+        Handler(Looper.getMainLooper()).postDelayed({isInternalWallpaperChange=false},300)
+    }
+
+    private fun enableBlocking(wm: WallpaperManager, writeRemote: Boolean = true) {
+        Log.i("MainActivity", "🔥 enableBlocking() llamada, blockingState=${blockingState.value}")
+        val bmp = BitmapFactory.decodeResource(resources, R.drawable.numbux_wallpaper_homelock)
+        if (bmp == null) {
+            Log.e("MainActivity", "No pude decodificar el drawable")
+            return
+        }
+        doWallpaperSwap {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                try {
+                    Log.d("MainActivity", "→ setBitmap START (SYSTEM|LOCK)")
+                    wm.setBitmap(
+                        bmp,
+                        /* visibleCropHint = */ null,
+                        /* allowBackup = */ true,
+                        WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK
+                    )
+                    Log.d("MainActivity", "← setBitmap OK")
+                } catch (e: Exception) {
+                    Log.e("MainActivity", "Error al cambiar wallpaper", e)
+                }
+            } else {
+                try {
+                    Log.d("MainActivity", "→ setBitmap START (legacy)")
+                    wm.setBitmap(bmp)
+                    Log.d("MainActivity", "← setBitmap OK")
+                } catch (e: Exception) {
+                    Log.e("MainActivity", "Error al cambiar wallpaper (legacy)", e)
+                }
+            }
+        }
+
+        val primary= if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.O_MR1) wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)?.primaryColor?.toArgb()?:Color.BLACK else Color.BLACK
+        prefs.edit()
+            .putInt(KEY_LAST_BACKUP_COLOR_HOME,primary)
+            .putInt(KEY_LAST_BACKUP_COLOR_LOCK,primary)
+            .putBoolean("backup_home_prompt",false)
+            .putBoolean("backup_lock_prompt",false)
+            .putBoolean("blocking_enabled",true)
+            .apply()
+        showBackupHomePrompt.value=false; showBackupLockPrompt.value=false
+        if(writeRemote) dbRef.setValue(true)
+        blockingState.value=true
+    }
+
+    @SuppressLint("NewApi")
+    private fun disableBlocking(wm: WallpaperManager, writeRemote: Boolean = true) {
+        // Suppress listener and restore both home and lock wallpapers
+        doWallpaperSwap {
+            try {
+                Log.d("MainActivity", "→ Restaurando HOME")
+                restoreHome(wm)
+                Log.d("MainActivity", "← HOME restaurado")
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Error restaurando HOME", e)
+            }
+            try {
+                Log.d("MainActivity", "→ Restaurando LOCK")
+                restoreLock(wm)
+                Log.d("MainActivity", "← LOCK restaurado")
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Error restaurando LOCK", e)
+            }
+        }
+
+        // Re-read and persist the restored colors
+        val newHome = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
+                ?.primaryColor
+                ?.toArgb() ?: -1
+        } else -1
+
+        val newLock = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            wm.getWallpaperColors(WallpaperManager.FLAG_LOCK)
+                ?.primaryColor
+                ?.toArgb() ?: -1
+        } else -1
+
+        prefs.edit()
+            .putInt(KEY_LAST_BACKUP_COLOR_HOME, newHome)
+            .putInt(KEY_LAST_BACKUP_COLOR_LOCK, newLock)
+            .putBoolean("backup_home_prompt", false)
+            .putBoolean("backup_lock_prompt", false)
+            .putBoolean("blocking_enabled", false)
+            .apply()
+
+        showBackupHomePrompt.value = false
+        showBackupLockPrompt.value = false
+
+        // Write remote flag if needed
+        if (writeRemote) dbRef.setValue(false)
+        blockingState.value = false
+    }
+
+    @SuppressLint("NewApi")
+    private fun restoreWallpaper(wm: WallpaperManager) {
+        val f=File(filesDir,"wallpaper_backup.png")
+        if(f.exists()){ val bmp=BitmapFactory.decodeFile(f.absolutePath)
+            if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.N) wm.setBitmap(bmp,null,true,WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK) else wm.setBitmap(bmp)
+        } else Toast.makeText(this,"No hay backup de fondo",Toast.LENGTH_SHORT).show()
+    }
+
+    @SuppressLint("NewApi")
+    private fun restoreHome(wm: WallpaperManager) {
+        val f=File(filesDir,"wallpaper_backup_home.png")
+        when {
+            f.exists()->{ val bmp=BitmapFactory.decodeFile(f.absolutePath); wm.setBitmap(bmp,null,true,WallpaperManager.FLAG_SYSTEM) }
+            backupHomeUri!=null-> contentResolver.openInputStream(backupHomeUri!!)?.use{val bmp=BitmapFactory.decodeStream(it); wm.setBitmap(bmp,null,true,WallpaperManager.FLAG_SYSTEM)}
+            else->Toast.makeText(this,"No hay backup HOME",Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    @SuppressLint("NewApi")
+    private fun restoreLock(wm: WallpaperManager) {
+        val f=File(filesDir,"wallpaper_backup_lock.png")
+        when {
+            f.exists()->{val bmp=BitmapFactory.decodeFile(f.absolutePath);wm.setBitmap(bmp,null,true,WallpaperManager.FLAG_LOCK)}
+            backupLockUri!=null-> contentResolver.openInputStream(backupLockUri!!)?.use{val bmp=BitmapFactory.decodeStream(it); wm.setBitmap(bmp,null,true,WallpaperManager.FLAG_LOCK)}
+            else->Toast.makeText(this,"No hay backup LOCK",Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onResume() {
@@ -863,24 +964,13 @@ class MainActivity : ComponentActivity() {
         // Firebase
         dbRef.addValueEventListener(firebaseListener)
 
-        // Wallpaper‐colors
+        // Wallpaper-colors
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             WallpaperManager
                 .getInstance(this)
-                .addOnColorsChangedListener(
-                    wallpaperColorsListener,
-                    Handler(Looper.getMainLooper())
-                )
+                .addOnColorsChangedListener(wallpaperColorsListener, Handler(Looper.getMainLooper()))
         } else {
-            wallpaperChangedReceiver = object : BroadcastReceiver() {
-                override fun onReceive(ctx: Context, intent: Intent) {
-                    // …
-                }
-            }
-            registerReceiver(
-                wallpaperChangedReceiver,
-                IntentFilter(Intent.ACTION_WALLPAPER_CHANGED)
-            )
+            registerReceiver(wallpaperChangedReceiver, IntentFilter(Intent.ACTION_WALLPAPER_CHANGED))
         }
     }
 
@@ -889,18 +979,19 @@ class MainActivity : ComponentActivity() {
         // Firebase
         dbRef.removeEventListener(firebaseListener)
 
-        // Wallpaper‐colors
+        // Wallpaper-colors
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             WallpaperManager
                 .getInstance(this)
                 .removeOnColorsChangedListener(wallpaperColorsListener)
         } else {
-            wallpaperChangedReceiver?.let { unregisterReceiver(it) }
+            unregisterReceiver(wallpaperChangedReceiver)
         }
     }
 
-    override fun onDestroy() {
+    override fun onDestroy(){
         super.onDestroy()
+        if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.O_MR1) WallpaperManager.getInstance(this).removeOnColorsChangedListener(wallpaperColorsListener)
+        else unregisterReceiver(wallpaperChangedReceiver)
     }
-
 }
