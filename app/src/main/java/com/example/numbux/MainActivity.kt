@@ -239,34 +239,40 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // 1) ActivityResultLauncher for Accessibility
         accessibilityLauncher = registerForActivityResult(
             ActivityResultContracts.StartActivityForResult()
         ) { _ ->
-            // Called as soon as the user returns from Accessibility Settings
             if (isAccessibilityServiceEnabled(this)) {
                 accessibilityDialog?.dismiss()
                 accessibilityDialog = null
             }
         }
+
+        // 2) SharedPreferences + initial state values
         prefs = PreferenceManager.getDefaultSharedPreferences(this)
         showBackupHomePrompt = mutableStateOf(prefs.getBoolean("backup_home_prompt", false))
         showBackupLockPrompt = mutableStateOf(prefs.getBoolean("backup_lock_prompt", false))
         blockingState = mutableStateOf(prefs.getBoolean("blocking_enabled", false))
 
+        // 3) Ensure Accessibility is on
+        if (!isAccessibilityServiceEnabled(this)) {
+            showEnableAccessibilityDialog()
+        }
 
-
-        // Accessibility service
-        if (!isAccessibilityServiceEnabled(this)) showEnableAccessibilityDialog()
-
-        // First-run init
+        // 4) First‑run initialization (backs up current wallpapers & prompts)
         if (!prefs.getBoolean("has_initialized", false)) {
             val wm = WallpaperManager.getInstance(this)
             val homeColor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1)
-                wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)?.primaryColor?.toArgb() ?: -1
+                wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
+                    ?.primaryColor?.toArgb() ?: -1
             else -1
+
             val lockColor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1)
-                wm.getWallpaperColors(WallpaperManager.FLAG_LOCK)?.primaryColor?.toArgb() ?: -1
+                wm.getWallpaperColors(WallpaperManager.FLAG_LOCK)
+                    ?.primaryColor?.toArgb() ?: -1
             else -1
+
             prefs.edit()
                 .putBoolean("has_initialized", true)
                 .putBoolean("blocking_enabled", false)
@@ -275,16 +281,24 @@ class MainActivity : ComponentActivity() {
                 .putBoolean("backup_home_prompt", true)
                 .putBoolean("backup_lock_prompt", true)
                 .apply()
+
             showBackupHomePrompt.value = true
             showBackupLockPrompt.value = true
+            blockingState.value = false
         }
 
-        // Catch-up wallpaper
+        // 5) Bootstrap the wallpaper on cold start
+        val wm = WallpaperManager.getInstance(this)
+        if (blockingState.value) {
+            enableBlocking(wm, /*writeRemote=*/false)
+        } else {
+            disableBlocking(wm, /*writeRemote=*/false)
+        }
+
+        // 6) Catch‑up wallpaper changes
         checkForWallpaperChange()
 
-        blockingState = mutableStateOf(prefs.getBoolean("blocking_enabled", false))
-
-        // Firebase listener
+        // 7) Firebase RTDB listener
         val firebaseUrl = "https://numbux-790d6-default-rtdb.europe-west1.firebasedatabase.app"
         dbRef = Firebase.database(firebaseUrl)
             .getReference("rooms/testRoom/blocking_enabled")
@@ -295,7 +309,6 @@ class MainActivity : ComponentActivity() {
                 runOnUiThread {
                     if (blockingState.value != remote) {
                         blockingState.value = remote
-                        val wm = WallpaperManager.getInstance(this@MainActivity)
                         if (remote) enableBlocking(wm, false) else disableBlocking(wm, false)
                     }
                 }
@@ -304,22 +317,19 @@ class MainActivity : ComponentActivity() {
                 Log.w("MainActivity", "Firebase listen failed", error.toException())
             }
         }
+        dbRef.addValueEventListener(firebaseListener)
 
-        // Wallpaper change listener
+        // 8) Wallpaper‑colors listener (for backup prompts)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            val wm = WallpaperManager.getInstance(this)
+            // create the listener
             wallpaperColorsListener = WallpaperManager.OnColorsChangedListener { colors, which ->
-                if (!isInternalWallpaperChange && System.currentTimeMillis() - lastInternalWallpaperChange >= 2_000L) {
+                if (!isInternalWallpaperChange &&
+                    System.currentTimeMillis() - lastInternalWallpaperChange >= 2_000L) {
+
                     when (which) {
-                        WallpaperManager.FLAG_SYSTEM -> {
-                            showBackupHomePrompt.value = true
-                        }
-                        WallpaperManager.FLAG_LOCK -> {
-                            // SOLO si el bloqueo NO está activo
-                            if (!blockingState.value) {
-                                showBackupLockPrompt.value = true
-                            }
-                        }
+                        WallpaperManager.FLAG_SYSTEM -> showBackupHomePrompt.value = true
+                        WallpaperManager.FLAG_LOCK ->
+                            if (!blockingState.value) showBackupLockPrompt.value = true
                     }
                     prefs.edit()
                         .putBoolean("backup_home_prompt", showBackupHomePrompt.value)
@@ -327,6 +337,11 @@ class MainActivity : ComponentActivity() {
                         .apply()
                 }
             }
+            // **CORRECTED** registration using a Handler on the main looper
+            wm.addOnColorsChangedListener(
+                wallpaperColorsListener,
+                Handler(Looper.getMainLooper())
+            )
         } else {
             wallpaperChangedReceiver = object : BroadcastReceiver() {
                 override fun onReceive(ctx: Context, intent: Intent) {
@@ -335,9 +350,10 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+            registerReceiver(wallpaperChangedReceiver, IntentFilter(Intent.ACTION_WALLPAPER_CHANGED))
         }
 
-        // Compose UI
+        // 9) Your Compose UI with the toggle
         setContent {
             val context = LocalContext.current
             val wm = WallpaperManager.getInstance(context)
