@@ -32,10 +32,22 @@ import com.google.firebase.ktx.Firebase
 
 import androidx.core.content.ContextCompat
 import com.example.numbux.R
-
-
+import com.google.firebase.database.DatabaseReference
+import android.app.WallpaperManager
+import android.graphics.BitmapFactory
+import java.io.File
 
 class AppBlockerService : AccessibilityService() {
+
+    companion object {
+        private const val firebaseUrl = "https://numbux-790d6-default-rtdb.europe-west1.firebasedatabase.app"
+        private const val TOGGLE_PATH = "rooms/testRoom/blocking_enabled"
+    }
+    private var appliedBlockingState = false
+
+    private lateinit var dbRef: DatabaseReference
+    private lateinit var firebaseListener: ValueEventListener
+    private var initialRemote = true
 
     private var recentsOverlay: View? = null
 
@@ -90,6 +102,7 @@ class AppBlockerService : AccessibilityService() {
                 }
                 inRecents = false
             }
+            applyWallpaper(enabled)
         }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -172,59 +185,49 @@ class AppBlockerService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
 
-        prefs = PreferenceManager
-            .getDefaultSharedPreferences(this)
-            .also { sp ->
-                sp.registerOnSharedPreferenceChangeListener(prefListener)
-            }
-        Log.i("AppBlockerService", "…CONNECTED")
+        // 1) Grab prefs & hook a listener so whenever we write "blocking_enabled" we react:
+        prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        prefs.registerOnSharedPreferenceChangeListener(prefListener)
+        Log.i("AppBlockerService", "…SERVICE CONNECTED")
 
-        // ——— Remote toggle listener via Firebase ———
+        // 2) Spin up our Firebase listener exactly once:
         val room = "testRoom"
         val firebaseUrl = "https://numbux-790d6-default-rtdb.europe-west1.firebasedatabase.app"
-        val dbRef = Firebase
+        dbRef = Firebase
             .database(firebaseUrl)
             .getReference("rooms")
             .child(room)
             .child("blocking_enabled")
 
-        dbRef.addValueEventListener(object : ValueEventListener {
+        firebaseListener = object : ValueEventListener {
+            private var initial = true
             override fun onDataChange(snapshot: DataSnapshot) {
-                snapshot.getValue(Boolean::class.java)?.let { remoteEnabled ->
+                val remoteEnabled = snapshot.getValue(Boolean::class.java) ?: return
+                if (initial) {
+                    initial = false
+                    return
+                }
+                val current = prefs.getBoolean("blocking_enabled", false)
+                if (remoteEnabled != current) {
                     prefs.edit().putBoolean("blocking_enabled", remoteEnabled).apply()
                 }
             }
             override fun onCancelled(error: DatabaseError) {
                 Log.w("AppBlockerService", "Remote toggle listen failed", error.toException())
             }
-        })
-
-        // ——— Enforce the current toggle state ———
-        val enabled = prefs.getBoolean("blocking_enabled", false)  // default = OFF
-
-        // grab WindowManager once
-        val wm = getSystemService(WINDOW_SERVICE) as WindowManager
-
-        if (enabled) {
-            initializeBlockList()
-        } else {
-            // tear down any overlays / blockers
-            recentsOverlay?.let {
-                wm.removeView(it)
-                recentsOverlay = null
-            }
-            touchBlocker?.let {
-                wm.removeView(it)
-                touchBlocker = null
-            }
-            inRecents = false
         }
+        dbRef.addValueEventListener(firebaseListener)
 
-        // ——— Now request key‐events ———
+        // 3) Enforce whatever the current pref says (this will call applyWallpaper once):
+        val currentlyEnabled = prefs.getBoolean("blocking_enabled", false)
+        appliedBlockingState = currentlyEnabled
+        applyWallpaper(currentlyEnabled)
+
+        // 4) Request key‑event filtering if you need it
         serviceInfo = serviceInfo.apply {
             flags = flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
         }
-        Log.i("AppBlockerService", "••• serviceInfo.flags = ${serviceInfo.flags}")
+        Log.i("AppBlockerService", "Service flags = ${serviceInfo.flags}")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
@@ -374,6 +377,8 @@ class AppBlockerService : AccessibilityService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        // tear down the DB listener and prefs listener
+        dbRef.removeEventListener(firebaseListener)
         prefs.unregisterOnSharedPreferenceChangeListener(prefListener)
     }
 
@@ -422,23 +427,44 @@ class AppBlockerService : AccessibilityService() {
         BlockManager.markAccessibilityServiceInitialized()
     }
 
-    private fun sendPinBroadcast(appPkg: String) {
-        Intent("com.example.numbux.SHOW_PIN").also { intent ->
-            intent.setPackage(applicationContext.packageName)
-            intent.putExtra("app_package", appPkg)
-            sendBroadcast(intent)
-        }
-        BlockManager.isShowingPin = true
-    }
-
     private val uninstallPackages = listOf(
         "com.android.packageinstaller",
         "com.google.android.packageinstaller",
         "com.android.permissioncontroller"
     )
 
-    private fun esIntentoDesactivarAccesibilidad(className: String?, pkg: String?): Boolean {
-        return pkg == "com.android.settings" &&
-                className?.contains("AlertDialog", ignoreCase = true) == true
+    private fun applyWallpaper(enabled: Boolean) {
+        val wm = WallpaperManager.getInstance(this)
+
+        // build a Bitmap either from your packaged “focus” wallpaper or from the saved backup file
+        val bmp = if (enabled) {
+            BitmapFactory.decodeResource(resources, R.drawable.numbux_wallpaper_homelock)
+        } else {
+            // look for the saved file under filesDir
+            val f = File(filesDir, "wallpaper_backup_home.png")
+            if (f.exists()) {
+                BitmapFactory.decodeFile(f.absolutePath)
+            } else {
+                // fallback to a solid color (or your own placeholder drawable)
+                BitmapFactory.decodeResource(resources, R.drawable.numbux_wallpaper_homelock)
+            }
+        }
+
+        doWallpaperSwap {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                wm.setBitmap(bmp, null, true,
+                    WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK)
+            } else {
+                wm.setBitmap(bmp)
+            }
+        }
+    }
+
+    private fun doWallpaperSwap(action: () -> Unit) {
+        // suppress duplicate WallpaperManager callbacks
+        var isInternal = true
+        action()
+        // re‑enable after a short delay
+        Handler(Looper.getMainLooper()).postDelayed({ isInternal = false }, 300)
     }
 }

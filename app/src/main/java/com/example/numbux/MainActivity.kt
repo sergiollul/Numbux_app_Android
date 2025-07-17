@@ -179,7 +179,6 @@ class MainActivity : ComponentActivity() {
     private var accessibilityDialog: AlertDialog? = null
     private lateinit var showBackupHomePrompt: MutableState<Boolean>
     private lateinit var showBackupLockPrompt: MutableState<Boolean>
-    private lateinit var dbRef: DatabaseReference
     private var wallpaperChangedReceiver: BroadcastReceiver? = null
     private lateinit var wallpaperColorsListener: WallpaperManager.OnColorsChangedListener
     private var isInternalWallpaperChange = false
@@ -192,7 +191,6 @@ class MainActivity : ComponentActivity() {
         set(value) = prefs.edit().putBoolean(PREF_SHOWN_BACKUP_EXPLANATION, value).apply()
     private var showBackupDialog by mutableStateOf(false)
     private lateinit var accessibilityLauncher: ActivityResultLauncher<Intent>
-    private lateinit var firebaseListener: ValueEventListener
     private var isBootstrap = false
 
     private var backupHomeUri: Uri?
@@ -241,7 +239,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private var initialRemoteEvent = true
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -301,39 +299,7 @@ class MainActivity : ComponentActivity() {
         // 6) Catch‑up wallpaper changes
         checkForWallpaperChange()
 
-        // 7) Firebase listener for remote toggle
-        val wm = WallpaperManager.getInstance(this)
-        firebaseListener = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val remote = snapshot.getValue(Boolean::class.java) ?: return
-                Log.i("MainActivity", "🔌 Firebase onDataChange — remote=$remote, local=${blockingState.value}")
 
-                // Skip the very first call
-                if (initialRemoteEvent) {
-                    initialRemoteEvent = false
-                    return
-                }
-
-                // Only fire if the value truly changed
-                if (remote != blockingState.value) {
-                    runOnUiThread {
-                        blockingState.value = remote
-                        if (remote) enableBlocking(wm, writeRemote = false)
-                        else       disableBlocking(wm, writeRemote = false)
-                    }
-                }
-            }
-
-            override fun onCancelled(error: DatabaseError) {
-                Log.w("MainActivity", "Firebase listen failed", error.toException())
-            }
-        }
-
-        // 7b) Attach our single listener immediately on create
-        dbRef = Firebase
-            .database(firebaseUrl)
-            .getReference("rooms/testRoom/blocking_enabled")
-        dbRef.addValueEventListener(firebaseListener)
 
         // 8) Initialize (but don't register) the wallpaper‑colors listener/receiver
         val wmSys = WallpaperManager.getInstance(this)
@@ -622,7 +588,7 @@ class MainActivity : ComponentActivity() {
         Handler(Looper.getMainLooper()).postDelayed({isInternalWallpaperChange=false},300)
     }
 
-    private fun enableBlocking(wm: WallpaperManager, writeRemote: Boolean = true) {
+    private fun enableBlocking(wm: WallpaperManager) {
         Log.i("MainActivity", "🔥 enableBlocking() llamada, blockingState=${blockingState.value}")
         val bmp = BitmapFactory.decodeResource(resources, R.drawable.numbux_wallpaper_homelock)
         if (bmp == null) {
@@ -630,7 +596,7 @@ class MainActivity : ComponentActivity() {
             return
         }
         // only actually swap if this is a real toggle or we've finished bootstrapping
-        if ((writeRemote || !isBootstrap) && appliedBlockingState != true) {
+        if (appliedBlockingState != true) {
             doWallpaperSwap {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                     try {
@@ -668,14 +634,14 @@ class MainActivity : ComponentActivity() {
             .putBoolean("blocking_enabled",true)
             .apply()
         showBackupHomePrompt.value=false; showBackupLockPrompt.value=false
-        if(writeRemote) dbRef.setValue(true)
+
         blockingState.value=true
     }
 
     @SuppressLint("NewApi")
-    private fun disableBlocking(wm: WallpaperManager, writeRemote: Boolean = true) {
+    private fun disableBlocking(wm: WallpaperManager) {
         // only actually swap if this is a real toggle or we've finished bootstrapping
-        if ((writeRemote || !isBootstrap) && appliedBlockingState != false) {
+        if (appliedBlockingState != false) {
             // Suppress listener and restore both home and lock wallpapers
             doWallpaperSwap {
                 try {
@@ -722,7 +688,7 @@ class MainActivity : ComponentActivity() {
         showBackupLockPrompt.value = false
 
         // Write remote flag if needed
-        if (writeRemote) dbRef.setValue(false)
+
         blockingState.value = false
     }
 
@@ -989,7 +955,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         // → register both here exactly once per start
-        dbRef.addValueEventListener(firebaseListener)
+
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             WallpaperManager
@@ -1003,7 +969,7 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         // → unregister both exactly once per stop
-        dbRef.removeEventListener(firebaseListener)
+
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             WallpaperManager
@@ -1018,7 +984,7 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
 
         // 1) Remove your single Firebase listener
-        dbRef.removeEventListener(firebaseListener)
+
 
         // 2) Unregister your wallpaper‑colors listener (or receiver)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
