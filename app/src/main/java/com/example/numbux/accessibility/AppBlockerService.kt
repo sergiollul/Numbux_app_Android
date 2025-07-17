@@ -439,26 +439,35 @@ class AppBlockerService : AccessibilityService() {
     private fun applyWallpaper(enabled: Boolean) {
         val wm = WallpaperManager.getInstance(this)
 
-        // build a Bitmap either from your packaged “focus” wallpaper or from the saved backup file
-        val bmp = if (enabled) {
-            BitmapFactory.decodeResource(resources, R.drawable.numbux_wallpaper_homelock)
-        } else {
-            // look for the saved file under filesDir
-            val f = File(filesDir, "wallpaper_backup_home.png")
-            if (f.exists()) {
-                BitmapFactory.decodeFile(f.absolutePath)
-            } else {
-                // fallback to a solid color (or your own placeholder drawable)
-                BitmapFactory.decodeResource(resources, R.drawable.numbux_wallpaper_homelock)
+        if (enabled) {
+            // modo foco: usa tu drawable empaquetado en ambas pantallas
+            val bmp = BitmapFactory.decodeResource(resources, R.drawable.numbux_wallpaper_homelock)
+            doWallpaperSwap {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    wm.setBitmap(bmp, null, true, WallpaperManager.FLAG_SYSTEM)
+                    wm.setBitmap(bmp, null, true, WallpaperManager.FLAG_LOCK)
+                } else {
+                    wm.setBitmap(bmp)
+                }
             }
-        }
 
-        doWallpaperSwap {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                wm.setBitmap(bmp, null, true,
-                    WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK)
-            } else {
-                wm.setBitmap(bmp)
+        } else {
+            // Modo normal: carga **dos** backups distintos
+            val homeBmp = File(filesDir, "wallpaper_backup_home.png").takeIf { it.exists() }
+                ?.let { BitmapFactory.decodeFile(it.absolutePath) }
+                ?: return  // o un fallback si quieres
+
+            val lockBmp = File(filesDir, "wallpaper_backup_lock.png").takeIf { it.exists() }
+                ?.let { BitmapFactory.decodeFile(it.absolutePath) }
+                ?: homeBmp // si no hay backup de lock, cae al home
+
+            doWallpaperSwap {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    wm.setBitmap(homeBmp, null, true, WallpaperManager.FLAG_SYSTEM)
+                    wm.setBitmap(lockBmp, null, true, WallpaperManager.FLAG_LOCK)
+                } else {
+                    wm.setBitmap(homeBmp)
+                }
             }
         }
     }
