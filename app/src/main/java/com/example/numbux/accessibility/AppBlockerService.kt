@@ -221,7 +221,10 @@ class AppBlockerService : AccessibilityService() {
         // 3) Enforce whatever the current pref says (this will call applyWallpaper once):
         val currentlyEnabled = prefs.getBoolean("blocking_enabled", false)
         appliedBlockingState = currentlyEnabled
-        applyWallpaper(currentlyEnabled)
+        // ← sólo aplicar si está “on”
+        if (currentlyEnabled) {
+            applyWallpaper(true)
+        }
 
         // 4) Request key‑event filtering if you need it
         serviceInfo = serviceInfo.apply {
