@@ -19,11 +19,6 @@ import androidx.compose.ui.unit.dp
 import androidx.preference.PreferenceManager
 import com.example.numbux.accessibility.AppBlockerService
 import com.example.numbux.ui.theme.NumbuxTheme
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.ValueEventListener
-import com.google.firebase.database.ktx.database
-import com.google.firebase.ktx.Firebase
 import androidx.compose.material3.ExperimentalMaterial3Api
 import android.content.SharedPreferences
 import androidx.compose.runtime.MutableState
@@ -39,21 +34,15 @@ import android.graphics.Color
 import android.view.ViewTreeObserver
 import android.graphics.drawable.ColorDrawable
 import android.app.WallpaperManager
-import android.graphics.Bitmap
 import androidx.compose.ui.platform.LocalContext
-import com.example.numbux.ui.BlockerToggle
 import android.os.Build
-import android.os.Build.VERSION_CODES
-import com.google.firebase.database.DatabaseReference
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import java.io.File
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
-import android.app.WallpaperManager.OnColorsChangedListener
 import android.os.Handler
 import android.os.Looper
-import android.app.WallpaperColors
 import android.annotation.SuppressLint
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.layout.Column
@@ -293,15 +282,10 @@ class MainActivity : ComponentActivity() {
             blockingState.value = false
         }
 
-        // 5) No bootstrap wallpaper apply on startup
-        //    (remove enableBlocking/disableBlocking calls here)
-
-        // 6) Catch‑up wallpaper changes
+        // 5) Catch‑up wallpaper changes
         checkForWallpaperChange()
 
-
-
-        // 8) Initialize (but don't register) the wallpaper‑colors listener/receiver
+        // 6) Initialize (but don't register) the wallpaper‑colors listener/receiver
         val wmSys = WallpaperManager.getInstance(this)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             wallpaperColorsListener = WallpaperManager.OnColorsChangedListener { colors, which ->
@@ -328,7 +312,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // 9) Your Compose UI with the toggle
+        // 7) Your Compose UI with the toggle
         setContent {
             val context = LocalContext.current
             val wm = WallpaperManager.getInstance(context)
