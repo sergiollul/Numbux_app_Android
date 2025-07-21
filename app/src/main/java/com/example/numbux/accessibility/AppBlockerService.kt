@@ -2,6 +2,7 @@ package com.example.numbux.accessibility
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.PixelFormat
@@ -37,7 +38,7 @@ import android.app.WallpaperManager
 import android.graphics.BitmapFactory
 import java.io.File
 
-import android.graphics.Rect
+import android.net.Uri
 
 class AppBlockerService : AccessibilityService() {
 
@@ -437,46 +438,65 @@ class AppBlockerService : AccessibilityService() {
         "com.google.android.packageinstaller",
         "com.android.permissioncontroller"
     )
-
+    @SuppressLint("NewApi")
     private fun applyWallpaper(enabled: Boolean) {
         val wm = WallpaperManager.getInstance(this)
 
         if (enabled) {
-            // modo foco: usa tu drawable empaquetado en ambas pantallas
-            val bmp = BitmapFactory.decodeResource(resources, R.drawable.numbux_wallpaper_homelock)
+            // — your existing focus‑mode code unchanged —
+            val bmp = BitmapFactory.decodeResource(
+                resources, R.drawable.numbux_wallpaper_homelock
+            )
             doWallpaperSwap {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                          wm.setBitmap(bmp, null, true,
-                                           WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK)
-                        } else {
-                          wm.setBitmap(bmp)
-                        }
+                    wm.setBitmap(
+                        bmp,
+                        /*visibleCropHint=*/null,
+                        /*allowBackup=*/true,
+                        WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK
+                    )
+                } else {
+                    wm.setBitmap(bmp)
+                }
             }
 
         } else {
-            // Modo normal: carga **dos** backups distintos
-            val homeBmp = File(filesDir, "wallpaper_backup_home.png").takeIf { it.exists() }
-                ?.let { BitmapFactory.decodeFile(it.absolutePath) }
-                ?: return  // o un fallback si quieres
+            // — tweak starts here —
+            val homeFile = File(filesDir, "wallpaper_backup_home.png")
+            val lockFile = File(filesDir, "wallpaper_backup_lock.png")
 
-            val lockBmp = File(filesDir, "wallpaper_backup_lock.png").takeIf { it.exists() }
+            val homeBmp = homeFile.takeIf { it.exists() }
                 ?.let { BitmapFactory.decodeFile(it.absolutePath) }
-                ?: homeBmp // si no hay backup de lock, cae al home
+                ?: return
+            val lockBmp = lockFile.takeIf { it.exists() }
+                ?.let { BitmapFactory.decodeFile(it.absolutePath) }
+                ?: homeBmp
 
             doWallpaperSwap {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    // full‑image crop hints
-                    val homeHint = Rect(0, 0, homeBmp.width, homeBmp.height)
-                    val lockHint = Rect(0, 0, lockBmp.width, lockBmp.height)
-
-                    wm.setBitmap(homeBmp, homeHint, true, WallpaperManager.FLAG_SYSTEM)
-                    wm.setBitmap(lockBmp, lockHint, true, WallpaperManager.FLAG_LOCK)
+                    // 1) first, set *both* screens to your HOME backup in one go,
+                    //    which resets Android’s internal crop/offset state exactly as your manual toggle does:
+                    wm.setBitmap(
+                        homeBmp,
+                        /*visibleCropHint=*/null,
+                        /*allowBackup=*/true,
+                        WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK
+                    )
+                    // 2) then immediately overwrite *only* the LOCK screen with its real backup:
+                    wm.setBitmap(
+                        lockBmp,
+                        /*visibleCropHint=*/null,
+                        /*allowBackup=*/true,
+                        WallpaperManager.FLAG_LOCK
+                    )
                 } else {
+                    // legacy fallback
                     wm.setBitmap(homeBmp)
                 }
             }
         }
     }
+
 
     private fun doWallpaperSwap(action: () -> Unit) {
         // suppress duplicate WallpaperManager callbacks
