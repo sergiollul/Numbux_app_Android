@@ -37,6 +37,8 @@ import android.app.WallpaperManager
 import android.graphics.BitmapFactory
 import java.io.File
 
+import android.graphics.Rect
+
 class AppBlockerService : AccessibilityService() {
 
     companion object {
@@ -444,11 +446,11 @@ class AppBlockerService : AccessibilityService() {
             val bmp = BitmapFactory.decodeResource(resources, R.drawable.numbux_wallpaper_homelock)
             doWallpaperSwap {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    wm.setBitmap(bmp, null, true, WallpaperManager.FLAG_SYSTEM)
-                    wm.setBitmap(bmp, null, true, WallpaperManager.FLAG_LOCK)
-                } else {
-                    wm.setBitmap(bmp)
-                }
+                          wm.setBitmap(bmp, null, true,
+                                           WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK)
+                        } else {
+                          wm.setBitmap(bmp)
+                        }
             }
 
         } else {
@@ -463,8 +465,12 @@ class AppBlockerService : AccessibilityService() {
 
             doWallpaperSwap {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    wm.setBitmap(homeBmp, null, true, WallpaperManager.FLAG_SYSTEM)
-                    wm.setBitmap(lockBmp, null, true, WallpaperManager.FLAG_LOCK)
+                    // full‑image crop hints
+                    val homeHint = Rect(0, 0, homeBmp.width, homeBmp.height)
+                    val lockHint = Rect(0, 0, lockBmp.width, lockBmp.height)
+
+                    wm.setBitmap(homeBmp, homeHint, true, WallpaperManager.FLAG_SYSTEM)
+                    wm.setBitmap(lockBmp, lockHint, true, WallpaperManager.FLAG_LOCK)
                 } else {
                     wm.setBitmap(homeBmp)
                 }
