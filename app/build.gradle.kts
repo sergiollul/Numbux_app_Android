@@ -82,4 +82,6 @@ dependencies {
     debugImplementation ("androidx.compose.ui:ui-tooling:1.5.0")
     implementation("androidx.work:work-runtime-ktx:2.8.0")
     implementation("androidx.preference:preference-ktx:1.2.0")
+    implementation("androidx.activity:activity-compose:1.7.2")
+    implementation("androidx.compose.material3:material3:1.1.0")
 }
