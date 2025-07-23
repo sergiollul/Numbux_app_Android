@@ -528,6 +528,10 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }
+
+                        if (showBackupDialog) {
+                            BackupExplanationDialog { showBackupDialog = false }
+                        }
                     }
                 }
             }
@@ -705,7 +709,124 @@ class MainActivity : ComponentActivity() {
             // service now on → dismiss it immediately
             accessibilityDialog?.dismiss()
             accessibilityDialog = null
+
+            // Solo si aún **no** lo hemos mostrado y el servicio YA está ON
+            if (!hasShownBackupExplanation) {
+                showBackupExplanation()
+                hasShownBackupExplanation = true   // se persiste en prefs
+            }
         }
+    }
+
+    private fun showBackupExplanation() {
+        showBackupDialog = true
+    }
+
+    @Composable
+    fun BackupExplanationDialog(onDismiss: () -> Unit) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+
+            // ← only one modifier block, combining width, background & padding
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .border(
+                    width = 2.dp,
+                    color = androidx.compose.ui.graphics.Color(0xFFFF6300),
+                    shape = RoundedCornerShape(16.dp)
+                ),
+            containerColor = androidx.compose.ui.graphics.Color(0xFF000000),
+            tonalElevation = 0.dp,
+            shape = RoundedCornerShape(16.dp),
+
+            // Title if you need it:
+            title = {
+                Text(
+                    text = "Restaurar Fondos",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = androidx.compose.ui.graphics.Color.White
+                )
+            },
+
+            text = {
+                Column {
+                    Text(
+                        text = "¿Qué son estos botones?",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = androidx.compose.ui.graphics.Color.White
+                    )
+                    Spacer(Modifier.height(4.dp))
+
+                    Button(
+                        onClick = { /* no-op */ },
+                        enabled = false,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = androidx.compose.ui.graphics.Color(0xFFFF6300),
+                            disabledContainerColor = androidx.compose.ui.graphics.Color(0xFFFF6300),
+                            contentColor = androidx.compose.ui.graphics.Color.White,
+                            disabledContentColor = androidx.compose.ui.graphics.Color.White
+                        )
+                    ) {
+                        Text(
+                            text = "🖼 Restaurar HOME",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = androidx.compose.ui.graphics.Color.Black,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    Spacer(Modifier.height(4.dp))
+
+                    Button(
+                        onClick = { /* no-op */ },
+                        enabled = false,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = androidx.compose.ui.graphics.Color(0xFFFF6300),
+                            disabledContainerColor = androidx.compose.ui.graphics.Color(0xFFFF6300),
+                            contentColor = androidx.compose.ui.graphics.Color.White,
+                            disabledContentColor = androidx.compose.ui.graphics.Color.White
+                        )
+                    ) {
+                        Text(
+                            text = "🔒 Restaurar LOCK",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = androidx.compose.ui.graphics.Color.Black,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    Spacer(Modifier.height(24.dp))
+
+                    Text(
+                        text = """
+                        Cuando el modo foco esté activado, tu fondo de pantalla y de bloqueo cambiarán.
+                        
+                        Estos botones son para que NumbuX restaure tus fondos una vez el modo foco se desactive.
+                        
+                        Por favor, selecciona tus fondos con estos botones.
+                    """.trimIndent(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = androidx.compose.ui.graphics.Color.White
+                    )
+                }
+            },
+
+            confirmButton = {
+                TextButton(onClick = onDismiss) {
+                    Text("OK")
+                }
+            }
+        )
     }
 
     @Composable
@@ -817,6 +938,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        // → register both here exactly once per start
+
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             WallpaperManager
@@ -829,6 +952,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
+        // → unregister both exactly once per stop
+
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             WallpaperManager
@@ -841,6 +966,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+
+        // 1) Remove your single Firebase listener
+
 
         // 2) Unregister your wallpaper‑colors listener (or receiver)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
