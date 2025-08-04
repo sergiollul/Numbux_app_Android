@@ -272,20 +272,33 @@ class AppBlockerService : AccessibilityService() {
         // ————— Always-on SYSTEM flows —————
 
         // 1) PIN-protect turning Accessibility OFF
+        // ——— Accessibility OFF *only* Numbux ———
         if (pkg == "com.android.settings"
             && cls.contains("AlertDialog", ignoreCase = true)
             && !BlockManager.isTemporarilyAllowed(pkg)
-            && (type == TYPE_WINDOW_STATE_CHANGED
-                    || type == TYPE_WINDOW_CONTENT_CHANGED
-                    || type == TYPE_WINDOWS_CHANGED)
         ) {
-            blockAllTouchesFor(3_000)
-            performGlobalAction(GLOBAL_ACTION_BACK)
-            startActivity(Intent(this, PinActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                putExtra("app_package", pkg)
-            })
-            return
+            val root = rootInActiveWindow ?: return
+            // buscamos el nombre de la app en el diálogo de accesibilidad
+            val isAccDialogForNumbux = root
+                .findAccessibilityNodeInfosByText(appName)
+                .isNotEmpty()
+
+            if (isAccDialogForNumbux) {
+                // a) al abrirse el diálogo: bloquea los toques
+                if (type == TYPE_WINDOW_STATE_CHANGED) {
+                    blockAllTouchesFor(2_000)
+                    performGlobalAction(GLOBAL_ACTION_BACK) // opcional: retrocede
+                    return
+                }
+                // b) cuando ya esté renderizado: lanza el PIN
+                if (type == TYPE_WINDOW_CONTENT_CHANGED || type == TYPE_WINDOWS_CHANGED) {
+                    startActivity(Intent(this, PinActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        putExtra("app_package", pkg)
+                    })
+                    return
+                }
+            }
         }
 
         // ————— Uninstall *only* Numbux —————
