@@ -165,6 +165,21 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var prefs: SharedPreferences
     private lateinit var blockingState: MutableState<Boolean>
+    private val prefsListener =
+        SharedPreferences.OnSharedPreferenceChangeListener { shared, key ->
+            if (key == "blocking_enabled") {
+                val newVal = shared.getBoolean(key, false)
+                if (blockingState.value != newVal) {
+                    blockingState.value = newVal
+                    // Immediately apply or remove the block
+                    if (newVal) {
+                        enableBlocking(WallpaperManager.getInstance(this@MainActivity))
+                    } else {
+                        disableBlocking(WallpaperManager.getInstance(this@MainActivity))
+                    }
+                }
+            }
+        }
     private var accessibilityDialog: AlertDialog? = null
     private lateinit var showBackupHomePrompt: MutableState<Boolean>
     private lateinit var showBackupLockPrompt: MutableState<Boolean>
@@ -231,6 +246,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 1. Set up SharedPreferences and initial state
+        prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        blockingState = mutableStateOf(prefs.getBoolean("blocking_enabled", false))
+
+        // 2. Register the listener before you setContent
+        prefs.registerOnSharedPreferenceChangeListener(prefsListener)
 
         // 1) ActivityResultLauncher for Accessibility
         accessibilityLauncher = registerForActivityResult(
@@ -962,6 +984,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+
+        prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
 
         // 1) Unregister your wallpaper‑colors listener (or receiver)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
