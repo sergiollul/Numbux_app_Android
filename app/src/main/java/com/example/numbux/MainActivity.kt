@@ -938,8 +938,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        // → register both here exactly once per start
-
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             WallpaperManager
@@ -952,8 +950,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
-        // → unregister both exactly once per stop
-
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             WallpaperManager
@@ -967,10 +963,7 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
 
-        // 1) Remove your single Firebase listener
-
-
-        // 2) Unregister your wallpaper‑colors listener (or receiver)
+        // 1) Unregister your wallpaper‑colors listener (or receiver)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             WallpaperManager
                 .getInstance(this)
